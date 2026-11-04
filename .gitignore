@@ -8,3 +8,7 @@ __pycache__/
 # datasets (large / reproducible)
 data/*
 !data/**/.gitkeep
+
+# tracked datasets
+!data/engine/
+!data/engine/engine_data.csv
