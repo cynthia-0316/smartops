@@ -184,7 +184,7 @@ python scripts/verify_setup.py
 jupyter notebook
 ```
 
-A browser tab opens. Have the human open `notebooks/ai4i_predictive_maintenance.ipynb` to confirm it loads. To stop Jupyter later: press `Ctrl+C` in the terminal, then `y`.
+A browser tab opens. Have the human open `notebooks/engine_condition_modeling.ipynb` to confirm it loads. To stop Jupyter later: press `Ctrl+C` in the terminal, then `y`.
 
 Optional quick data peek in a Python shell or a new notebook cell:
 

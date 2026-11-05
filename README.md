@@ -1,4 +1,4 @@
-﻿# SmartOps
+# SmartOps
 
 Course project for **Class 508** — predictive maintenance analytics (engine condition dataset).
 
@@ -6,7 +6,7 @@ Course project for **Class 508** — predictive maintenance analytics (engine co
 
 | Folder | Contents |
 |---|---|
-| `notebooks/` | Jupyter notebooks (modeling, data cleaning, condition monitoring) |
+| `notebooks/` | Jupyter notebook for engine condition modeling (data checks, outliers, models) |
 | `sql/` | SQL scripts |
 | `reports/` | Written reports and summaries |
 | `data/` | Datasets (not tracked in git; see `.gitignore`) |
