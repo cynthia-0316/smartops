@@ -1,6 +1,6 @@
 ﻿# SmartOps
 
-Course project for **Class 508** — predictive maintenance analytics (AI4I and hydraulic condition monitoring datasets).
+Course project for **Class 508** — predictive maintenance analytics (engine condition dataset).
 
 ## Structure
 
