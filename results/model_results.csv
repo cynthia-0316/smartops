@@ -1,4 +1,6 @@
 date,who,model,features,params,n_rows,cv_auc_mean,cv_auc_std,cv_pr_auc_mean,cv_pr_auc_std,cv_f1_mean,cv_f1_std,cv_recall_mean,cv_recall_std,cv_precision_mean,cv_precision_std,fit_time_mean_s,notes
+2026-11-05,Uzair Khan,LightGBM,raw,{'defaults': True},16604,0.6896,0.0091,0.7907,0.0092,0.755,0.005,0.8258,0.0093,0.6955,0.0043,0.068,fit time measured with n_jobs=1 per model
+2026-11-05,Uzair Khan,LightGBM tuned,raw,RandomizedSearchCV n_iter=25,16604,0.7025,0.0088,0.7999,0.0089,0.7616,0.0041,0.8379,0.0065,0.698,0.0035,20.6,NESTED CV (search inside each outer training fold); fit time includes the search
 2026-11-05,Uzair Khan,Dummy (class prior),raw,,16604,0.5,0.0,0.6305,0.0,0.7734,0.0,1.0,0.0,0.6305,0.0,0.009,"trivial baseline: no signal, AUC 0.5"
 2026-11-05,Uzair Khan,Dummy (always Needs Maintenance),raw,,16604,0.5,0.0,0.6305,0.0,0.7734,0.0,1.0,0.0,0.6305,0.0,0.001,trivial baseline: F1 reference
 2026-11-05,Uzair Khan,GradientBoosting (sklearn),raw,{'defaults': True},16604,0.7007,0.0085,0.7977,0.0085,0.7614,0.0042,0.8409,0.0063,0.6956,0.0039,1.328,
