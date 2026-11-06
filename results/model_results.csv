@@ -1,0 +1,1 @@
+date,who,model,features,params,n_rows,cv_auc_mean,cv_auc_std,cv_pr_auc_mean,cv_pr_auc_std,cv_f1_mean,cv_f1_std,cv_recall_mean,cv_recall_std,cv_precision_mean,cv_precision_std,fit_time_mean_s,notes
