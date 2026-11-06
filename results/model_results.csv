@@ -1,1 +1,7 @@
 date,who,model,features,params,n_rows,cv_auc_mean,cv_auc_std,cv_pr_auc_mean,cv_pr_auc_std,cv_f1_mean,cv_f1_std,cv_recall_mean,cv_recall_std,cv_precision_mean,cv_precision_std,fit_time_mean_s,notes
+2026-11-05,Uzair Khan,Dummy (class prior),raw,,16604,0.5,0.0,0.6305,0.0,0.7734,0.0,1.0,0.0,0.6305,0.0,0.009,"trivial baseline: no signal, AUC 0.5"
+2026-11-05,Uzair Khan,Dummy (always Needs Maintenance),raw,,16604,0.5,0.0,0.6305,0.0,0.7734,0.0,1.0,0.0,0.6305,0.0,0.001,trivial baseline: F1 reference
+2026-11-05,Uzair Khan,GradientBoosting (sklearn),raw,{'defaults': True},16604,0.7007,0.0085,0.7977,0.0085,0.7614,0.0042,0.8409,0.0063,0.6956,0.0039,1.328,
+2026-11-05,Uzair Khan,HistGradientBoosting (sklearn),raw,{'defaults': True},16604,0.6957,0.01,0.795,0.01,0.7585,0.0044,0.8367,0.0105,0.6937,0.0044,0.058,
+2026-11-05,Uzair Khan,GradientBoosting (sklearn) tuned,raw,RandomizedSearchCV n_iter=25,16604,0.702,0.0088,0.7991,0.0092,0.7642,0.0038,0.8513,0.0093,0.6933,0.0046,181.0,NESTED CV (search inside each outer training fold); fit time includes the search
+2026-11-05,Uzair Khan,HistGradientBoosting (sklearn) tuned,raw,RandomizedSearchCV n_iter=25,16604,0.7003,0.0092,0.7977,0.0093,0.7616,0.0045,0.8382,0.0064,0.6978,0.0045,7.4,NESTED CV (search inside each outer training fold); fit time includes the search
