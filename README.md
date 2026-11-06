@@ -31,5 +31,5 @@ Every model is scored with the shared code in `src/common.py` so results are com
 - **CV:** repeated stratified 5-fold x 3, seed 42 (`evaluate()` does this for you).
 - **Metrics:** ROC AUC (main), PR AUC, F1, recall, precision for "Needs Maintenance".
 - **Test set:** scored once at the very end (`load_test(confirm=True)`). Do not use it for tuning.
-- **Results log:** `evaluate()` appends a row to `results/model_results.csv`. Commit it with your PR (a `merge=union` rule in `.gitattributes` keeps both sides if two people add rows).
+- **Results log:** `evaluate()` appends a row to `results/model_results.csv`. Commit it with your PR (a `merge=union` rule in `.gitattributes` keeps both sides when you merge locally; if GitHub reports a conflict in this file, keep all rows from both sides).
 - Put scaling and other preprocessing inside a scikit-learn `Pipeline`.
