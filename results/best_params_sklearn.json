@@ -1,0 +1,16 @@
+{
+  "GradientBoosting (sklearn)": {
+    "learning_rate": 0.012502377950801122,
+    "max_depth": 4,
+    "min_samples_leaf": 13,
+    "n_estimators": 228,
+    "subsample": 0.679486272613669
+  },
+  "HistGradientBoosting (sklearn)": {
+    "l2_regularization": 8.568869785189005,
+    "learning_rate": 0.040482984757722995,
+    "max_iter": 406,
+    "max_leaf_nodes": 14,
+    "min_samples_leaf": 30
+  }
+}
