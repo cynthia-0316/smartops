@@ -3,3 +3,9 @@ numpy
 scikit-learn
 matplotlib
 jupyter
+xgboost
+lightgbm
+catboost
+shap
+optuna
+seaborn
