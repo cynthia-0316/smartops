@@ -9,3 +9,7 @@ date,who,model,features,params,n_rows,cv_auc_mean,cv_auc_std,cv_pr_auc_mean,cv_p
 2026-11-05,Uzair Khan,HistGradientBoosting (sklearn),raw,{'defaults': True},16604,0.6957,0.01,0.795,0.01,0.7585,0.0044,0.8367,0.0105,0.6937,0.0044,0.058,
 2026-11-05,Uzair Khan,GradientBoosting (sklearn) tuned,raw,RandomizedSearchCV n_iter=25,16604,0.702,0.0088,0.7991,0.0092,0.7642,0.0038,0.8513,0.0093,0.6933,0.0046,181.0,NESTED CV (search inside each outer training fold); fit time includes the search
 2026-11-05,Uzair Khan,HistGradientBoosting (sklearn) tuned,raw,RandomizedSearchCV n_iter=25,16604,0.7003,0.0092,0.7977,0.0093,0.7616,0.0045,0.8382,0.0064,0.6978,0.0045,7.4,NESTED CV (search inside each outer training fold); fit time includes the search
+2026-11-10,rbhand16-lab,XGBoost,raw,{'defaults': True},16604,0.662,0.0109,0.7699,0.0098,0.737,0.0066,0.79,0.0111,0.6907,0.0049,0.084,fit time measured with n_jobs=1 per model
+2026-11-10,rbhand16-lab,XGBoost tuned,raw,RandomizedSearchCV n_iter=25,16604,0.7018,0.0088,0.7995,0.0089,0.7645,0.0036,0.8551,0.0081,0.6913,0.004,9.5,NESTED CV (search inside each outer training fold); fit time includes the search
+2026-11-10,rbhand16-lab,CatBoost,raw,{'defaults': True},16604,0.6915,0.0086,0.7928,0.0091,0.7555,0.0048,0.828,0.0078,0.6946,0.0044,2.498,fit time measured with thread_count=1 per model
+2026-11-10,rbhand16-lab,CatBoost tuned,raw,RandomizedSearchCV n_iter=20,16604,0.703,0.0085,0.8004,0.0089,0.7632,0.0041,0.8437,0.0083,0.6967,0.0038,28.0,NESTED CV (search inside each outer training fold); fit time includes the search
