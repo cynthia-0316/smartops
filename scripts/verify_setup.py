@@ -27,7 +27,8 @@ check(f"Python {sys.version.split()[0]} (need 3.10+)", sys.version_info >= (3, 1
 check("virtual environment is active", sys.prefix != getattr(sys, "base_prefix", sys.prefix),
       "activate .venv first (see SETUP_INSTRUCTIONS.md step 7)")
 
-for pkg in ["pandas", "numpy", "sklearn", "matplotlib", "jupyter_core"]:
+for pkg in ["pandas", "numpy", "sklearn", "matplotlib", "jupyter_core",
+            "xgboost", "lightgbm", "catboost", "shap", "optuna", "seaborn"]:
     try:
         importlib.import_module(pkg)
         check(f"import {pkg}", True)

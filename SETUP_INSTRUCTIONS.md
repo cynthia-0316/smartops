@@ -22,7 +22,7 @@
 | Owner | `cynthia-0316` |
 | Teammates with access | `xwang660-dev`, `Noah-DV`, `mkhan352` |
 | Language | Python 3.10 or newer (3.12 or 3.13 are safest) |
-| Packages | pandas, numpy, scikit-learn, matplotlib, jupyter (`requirements.txt`) |
+| Packages | pandas, numpy, scikit-learn, matplotlib, jupyter, xgboost, lightgbm, catboost, shap, optuna, seaborn (`requirements.txt`) |
 | Dataset | https://huggingface.co/datasets/jskswamy/predictive-maintenance-data (MIT license, ~8 MB, public – no login needed) |
 | Course | CIS 508 Machine Learning (ASU) |
 
@@ -240,4 +240,5 @@ Tell the human, in plain language: what was installed, where the project folder 
 | `verify_setup.py`: "virtual environment is active" FAIL | Activate `.venv` (Step 7) and re-run. |
 | `jupyter: command not found` | Venv not active, or `pip install -r requirements.txt` did not finish – redo Step 7. |
 | `git pull` says "local changes would be overwritten" | `git stash`, `git pull`, `git stash pop` – or ask the team. |
+| `import lightgbm` / `xgboost` / `catboost` / `shap` fails in `verify_setup.py` | Activate `.venv`, then `pip install -r requirements.txt`. On macOS, if LightGBM complains about `libomp`, run `brew install libomp`. If a package fails to build on a very new Python, use Python 3.12 or 3.13 (see the Python 3.14 row above). Tested working on macOS arm64 with Python 3.14.6, no extra step needed. |
 | Anything else | Copy the **full** error text and post it in the team chat. Do not retry random commands. |
