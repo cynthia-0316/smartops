@@ -1,0 +1,4 @@
+model,test_auc,ci_lo,ci_hi,diff_vs_catboost,diff_ci_lo,diff_ci_hi,pr_auc,brier
+Spline LR (additive),0.7099,0.6921,0.7289,0.0015,-0.0022,0.0049,0.807,0.2044
+Stack CatBoost+Spline LR,0.7094,0.6913,0.7284,0.001,-0.0018,0.0037,0.8065,0.2049
+CatBoost tuned (#18),0.7085,0.6903,0.7271,0.0,0.0,0.0,0.8054,0.2046

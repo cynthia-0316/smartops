@@ -12,3 +12,9 @@ data/*
 # tracked datasets
 !data/engine/
 !data/engine/engine_data.csv
+
+# experiment outputs that are large or regenerable
+experiments/preds/
+experiments/catboost_info/
+experiments/report_data.json
+catboost_info/
