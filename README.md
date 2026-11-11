@@ -2,13 +2,16 @@
 
 Course project for **Class 508** — predictive maintenance analytics (engine condition dataset).
 
+**Results at a glance:** open [`reports/smartops_results.html`](reports/smartops_results.html) in a browser (one self-contained page with every finding, chart and model result).
+
 ## Structure
 
 | Folder | Contents |
 |---|---|
-| `notebooks/` | Jupyter notebook for engine condition modeling (data checks, outliers, models) |
+| `notebooks/` | Jupyter notebooks: data checks, each boosting library, thresholds, interpretation, final comparison |
+| `experiments/` | Model-improvement experiments (all model families, GAM, neural nets, ensembles) and the report builder; see `experiments/RESULTS.md` |
 | `sql/` | SQL scripts |
-| `reports/` | Written reports and summaries |
+| `reports/` | Written reports, figures and the results page |
 | `data/` | Datasets (not tracked in git; see `.gitignore`) |
 
 ## Setup

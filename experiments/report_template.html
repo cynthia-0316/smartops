@@ -1,0 +1,625 @@
+<title>SmartOps Engine Model Report</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a single reading column (max 1080px) with a sticky section bar; every chart is drawn from the embedded data. */
+:root {
+  --plane: #f4f6f8; --surface: #ffffff; --ink: #11161c; --ink-2: #4a525c; --muted: #7d8692;
+  --grid: #e3e7eb; --axis: #c2c9d0; --ring: rgba(17,22,28,0.10);
+  --accent: #2a78d6; --accent-soft: #e4effc;
+  --normal: #2a78d6; --maint: #eb6834; --s3: #1baf7a;
+  --div-neg: #2a78d6; --div-mid: #eef0f2; --div-pos: #e34948;
+  --good: #0a7d0a; --warn-ink: #8a5a00;
+  --f-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --f-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --plane: #0e1114; --surface: #171b20; --ink: #eef1f4; --ink-2: #b9c1ca; --muted: #8a939d;
+  --grid: #262c33; --axis: #3a424b; --ring: rgba(255,255,255,0.10);
+  --accent: #4b93ea; --accent-soft: #1b2b40;
+  --normal: #3987e5; --maint: #e0652f; --s3: #199e70;
+  --div-neg: #3987e5; --div-mid: #2a3038; --div-pos: #e66767;
+  --good: #31b531; --warn-ink: #e0a838; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --plane: #0e1114; --surface: #171b20; --ink: #eef1f4; --ink-2: #b9c1ca; --muted: #8a939d;
+  --grid: #262c33; --axis: #3a424b; --ring: rgba(255,255,255,0.10);
+  --accent: #4b93ea; --accent-soft: #1b2b40;
+  --normal: #3987e5; --maint: #e0652f; --s3: #199e70;
+  --div-neg: #3987e5; --div-mid: #2a3038; --div-pos: #e66767;
+  --good: #31b531; --warn-ink: #e0a838; color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { background: var(--plane); color: var(--ink); font: 15px/1.6 var(--f-body); margin: 0; }
+.wrap { max-width: 1080px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1, h2, h3 { font-family: var(--f-display); line-height: 1.15; text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(2rem, 5vw, 3.1rem); font-weight: 800; letter-spacing: -0.02em; }
+h2 { font-size: clamp(1.45rem, 3vw, 1.9rem); font-weight: 700; letter-spacing: -0.01em; }
+h3 { font-size: 1.08rem; font-weight: 600; }
+p { margin: 0; max-width: 68ch; }
+.eyebrow { font: 500 0.74rem/1 var(--f-mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.mono { font-family: var(--f-mono); }
+.num { font-variant-numeric: tabular-nums; }
+a { color: var(--accent); }
+
+header.hero { padding-block: 48px 28px; display: grid; gap: 18px; }
+.hero .lede { font-size: 1.12rem; color: var(--ink-2); max-width: 62ch; }
+.hero .meta { display: flex; flex-wrap: wrap; gap: 6px 18px; color: var(--muted); font-size: 0.85rem; }
+
+nav.toc { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--plane); border-bottom: 1px solid var(--grid); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--plane); }
+nav.toc .wrap { display: flex; gap: 4px; overflow-x: auto; padding-block: 8px; scrollbar-width: none; }
+nav.toc a { flex: none; font: 500 0.82rem/1 var(--f-body); color: var(--ink-2); text-decoration: none; padding: 8px 10px; border-radius: 6px; }
+nav.toc a:hover, nav.toc a:focus-visible { background: var(--accent-soft); color: var(--ink); outline: none; }
+
+section { padding-block: 44px 8px; display: grid; gap: 20px; scroll-margin-top: 56px; }
+.sec-head { display: grid; gap: 8px; }
+.sec-head p { color: var(--ink-2); }
+
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+.tile { background: var(--surface); border: 1px solid var(--ring); border-radius: 10px; padding: 16px 18px; display: grid; gap: 4px; align-content: start; }
+.tile .v { font: 700 2rem/1.1 var(--f-display); letter-spacing: -0.02em; }
+.tile .l { font-size: 0.86rem; color: var(--ink-2); }
+.tile.key { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+
+.answer { background: var(--surface); border: 1px solid var(--ring); border-radius: 12px; padding: 20px 22px; display: grid; gap: 10px; }
+.answer ul { margin: 0; padding-left: 20px; display: grid; gap: 6px; max-width: 72ch; }
+
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr)); gap: 16px; align-items: start; }
+.wraptbl td, .wraptbl th { white-space: normal; }
+.card { background: var(--surface); border: 1px solid var(--ring); border-radius: 10px; padding: 16px 18px 14px; display: grid; gap: 10px; min-width: 0; }
+.card .cap { font-size: 0.86rem; color: var(--ink-2); }
+.card .note { font-size: 0.8rem; color: var(--muted); }
+.chart { width: 100%; min-height: 40px; position: relative; }
+.chart svg { display: block; overflow: visible; }
+.chart text { font-family: var(--f-body); }
+
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 0.82rem; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
+.legend i.dot { width: 9px; height: 9px; border-radius: 50%; }
+
+.callout { border-left: 3px solid var(--accent); padding: 4px 0 4px 14px; color: var(--ink-2); max-width: 72ch; }
+.callout b { color: var(--ink); }
+
+.tbl-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--ring); border-radius: 10px; }
+table { border-collapse: collapse; width: 100%; font-size: 0.86rem; }
+th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+th { font: 600 0.74rem/1.2 var(--f-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); background: var(--surface); position: sticky; top: 0; cursor: default; }
+th.sortable { cursor: pointer; } th.sortable:hover { color: var(--ink); }
+td.r, th.r { text-align: right; font-variant-numeric: tabular-nums; }
+tr:last-child td { border-bottom: 0; }
+tr.hl td { background: var(--accent-soft); }
+.chip { display: inline-block; font: 500 0.7rem/1 var(--f-mono); padding: 4px 6px; border-radius: 4px; background: var(--accent-soft); color: var(--accent); letter-spacing: 0.03em; }
+.chip.muted { background: transparent; color: var(--muted); border: 1px solid var(--grid); }
+.chip.good { background: transparent; color: var(--good); border: 1px solid currentColor; }
+
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.seg { display: inline-flex; border: 1px solid var(--ring); border-radius: 8px; overflow: hidden; background: var(--surface); }
+.seg button { font: 500 0.82rem/1 var(--f-body); color: var(--ink-2); background: none; border: 0; padding: 8px 12px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+.seg button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+input[type="search"] { font: 0.86rem var(--f-body); padding: 8px 10px; border: 1px solid var(--ring); border-radius: 8px; background: var(--surface); color: var(--ink); min-width: 0; width: min(280px, 100%); }
+
+.steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.step { background: var(--surface); border: 1px solid var(--ring); border-radius: 10px; padding: 14px 16px; display: grid; gap: 6px; align-content: start; }
+.step .n { font: 600 0.75rem/1 var(--f-mono); color: var(--accent); }
+.step p { font-size: 0.88rem; color: var(--ink-2); }
+
+.gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 14px; }
+.gallery figure { margin: 0; background: #fff; border: 1px solid var(--ring); border-radius: 10px; overflow: hidden; display: grid; }
+.gallery img { width: 100%; height: 200px; object-fit: contain; background: #fff; padding: 8px; cursor: zoom-in; }
+.gallery figcaption { background: var(--surface); padding: 10px 12px; font-size: 0.82rem; color: var(--ink-2); display: grid; gap: 2px; }
+.gallery figcaption b { font: 500 0.72rem/1.3 var(--f-mono); color: var(--muted); word-break: break-all; }
+dialog { border: 0; padding: 0; max-width: min(1100px, 96vw); background: #fff; border-radius: 10px; }
+dialog img { display: block; max-width: 100%; max-height: 86vh; }
+dialog::backdrop { background: rgba(0,0,0,0.6); }
+
+.tip { position: fixed; pointer-events: none; z-index: 50; background: var(--ink); color: var(--plane); font: 0.8rem/1.4 var(--f-body); padding: 8px 10px; border-radius: 6px; max-width: 280px; box-shadow: 0 4px 16px rgba(0,0,0,0.2); }
+.tip b { font-weight: 600; }
+
+footer { padding-block: 48px 64px; color: var(--muted); font-size: 0.82rem; display: grid; gap: 6px; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+@media (max-width: 520px) { .tile .v { font-size: 1.6rem; } th, td { padding: 7px 9px; } }
+</style>
+
+<nav class="toc" aria-label="Sections"><div class="wrap">
+  <a href="#answer">Answer</a><a href="#data">Data</a><a href="#method">Method</a><a href="#models">Models</a>
+  <a href="#why">Why it plateaus</a><a href="#learned">What it learned</a><a href="#test">Test set</a>
+  <a href="#use">Using it</a><a href="#next">Limits &amp; next</a><a href="#work">Work log</a><a href="#figures">Figures</a><a href="#all">All runs</a>
+</div></nav>
+
+<div class="wrap">
+<header class="hero">
+  <span class="eyebrow">SmartOps · CIS 508 Machine Learning · Arizona State University</span>
+  <h1>Which engines need maintenance?</h1>
+  <p class="lede">We scored 99 model configurations that predict <b>Engine Condition</b> (Normal vs Needs Maintenance) from six engine sensors. This page collects every finding, figure and result from the project so far.</p>
+  <div class="meta"><span>Dataset: jskswamy/predictive-maintenance-data (Hugging Face)</span><span>Team: Uzair, Rishabh, Cynthia, Xin, Noah</span><span id="gen-date"></span></div>
+</header>
+
+<section id="answer" aria-labelledby="h-answer">
+  <div class="sec-head"><span class="eyebrow">The short answer</span><h2 id="h-answer">Every good model lands at the same score, about 0.71 AUC</h2></div>
+  <div class="tiles" id="tiles"></div>
+  <div class="answer">
+    <h3>What we found</h3>
+    <ul>
+      <li><b>Best model: a GAM</b> (a smooth curve per sensor, added up). It ties the best gradient-boosting models and is faster, easier to explain and well calibrated.</li>
+      <li><b>The limit is the data, not the algorithm.</b> Boosting, neural nets, random forests, stacks and ensembles all stop at 0.703 to 0.705 cross-validated AUC and about 0.71 on the test set. We estimate the ceiling for this data at about 0.707.</li>
+      <li><b>Engine RPM carries most of the signal.</b> Low RPM goes with "Needs Maintenance". Fuel pressure, lub oil temperature and lub oil pressure add a little; the coolant sensors add almost nothing.</li>
+      <li><b>The business gain is modest.</b> 63% of engines are labelled "Needs Maintenance", so random picking is already right 63% of the time. The model's top 10% is right about 91% of the time.</li>
+    </ul>
+  </div>
+</section>
+
+<section id="data" aria-labelledby="h-data">
+  <div class="sec-head"><span class="eyebrow">1 · The data</span><h2 id="h-data">Six sensors, one label, no missing values</h2>
+  <p>Each row is one reading from a diesel engine: RPM, three pressures and two temperatures, plus a label. The data is a public Hugging Face upload. It does not say how it was collected or how "Needs Maintenance" was decided.</p></div>
+  <div class="grid2">
+    <div class="card"><h3>Class balance</h3><div class="chart" id="c-balance"></div>
+      <p class="cap">Most rows are labelled "Needs Maintenance". This is not a rare-failure problem: a model that flags every engine is already right 63% of the time.</p></div>
+    <div class="card"><h3>How the data was split</h3><div class="chart" id="c-split"></div>
+      <p class="cap">All tuning and model choice used train + validation (16,604 rows) with cross-validation. The test set was held back for final checks only.</p></div>
+  </div>
+  <div class="card"><h3>Sensor readings by class</h3>
+    <div class="legend"><span><i style="background:var(--normal)"></i>Normal</span><span><i style="background:var(--maint)"></i>Needs Maintenance</span></div>
+    <div class="chart" id="c-dists"></div>
+    <p class="cap">Share of engines at each reading (density), central 99% of values. RPM shows the clearest gap between the two classes; the curves for the coolant sensors almost overlap.</p></div>
+  <div class="grid2">
+    <div class="card"><h3>How well each sensor separates the classes on its own</h3><div class="chart" id="c-uni"></div>
+      <p class="cap">ROC AUC of each raw sensor alone (0.5 = no information). The arrow shows the direction: ↓ means lower readings go with "Needs Maintenance".</p></div>
+    <div class="card"><h3>Sensors are almost unrelated to each other</h3><div class="chart" id="c-corr"></div>
+      <p class="cap">Spearman correlation between sensors. No pair goes beyond ±0.09, overall or within each class. Real engine sensors usually move together (RPM and pressures, for example), so this pattern suggests the data may be synthetic.</p></div>
+  </div>
+  <div class="grid2">
+    <div class="card"><h3>Data quality checks</h3><div class="tbl-wrap" style="border:0"><table id="t-quality" class="wraptbl"></table></div></div>
+    <div class="card"><h3>Outliers (1.5 × IQR rule)</h3><div class="chart" id="c-out"></div>
+      <p class="cap" id="out-cap"></p></div>
+  </div>
+</section>
+
+<section id="method" aria-labelledby="h-method">
+  <div class="sec-head"><span class="eyebrow">2 · How models were compared</span><h2 id="h-method">One protocol for every model</h2>
+  <p>All results come from the shared code in <span class="mono">src/common.py</span>, so every model saw the same data and the same folds.</p></div>
+  <div class="steps">
+    <div class="step"><span class="n">Data</span><h3>Train + validation</h3><p>16,604 engines. The 2,931-engine test set stays locked.</p></div>
+    <div class="step"><span class="n">Cross-validation</span><h3>5 folds × 3 repeats</h3><p>15 train/score rounds with seed 42. Scores are the mean and spread over the 15 folds.</p></div>
+    <div class="step"><span class="n">Tuning</span><h3>Nested CV</h3><p>Settings are searched only inside each training fold, so the reported score is not inflated by the search.</p></div>
+    <div class="step"><span class="n">Metric</span><h3>ROC AUC first</h3><p>How well the model ranks engines by risk. F1 is misleading here: flagging every engine gives F1 0.77.</p></div>
+    <div class="step"><span class="n">Comparison</span><h3>Paired tests</h3><p>Models are compared fold by fold with a corrected resampled t-test.</p></div>
+  </div>
+</section>
+
+<section id="models" aria-labelledby="h-models">
+  <div class="sec-head"><span class="eyebrow">3 · Model results</span><h2 id="h-models">Every model type lands in one narrow band</h2>
+  <p>Best cross-validated AUC for each kind of model we tried. Bars show ±1 standard deviation across the 15 folds. The dashed line is the estimated ceiling for this data.</p></div>
+  <div class="card">
+    <div class="controls"><div class="seg" role="group" aria-label="Which scores to show">
+      <button type="button" id="b-key" aria-pressed="true">Key models</button><button type="button" id="b-honest" aria-pressed="false">Honest scores only</button></div></div>
+    <div class="chart" id="c-board"></div>
+    <p class="note">"Honest" means the score was not used to pick the model's settings (defaults, nested CV, or settings chosen automatically inside each fit). The always-guess baselines (AUC 0.50) are left off the scale. All 99 runs are in <a href="#all">All runs</a>.</p>
+  </div>
+  <div class="grid2">
+    <div class="card"><h3>Tuning helps, but only up to the same ceiling</h3>
+      <div class="legend"><span><i class="dot" style="background:var(--muted)"></i>Default settings</span><span><i class="dot" style="background:var(--accent)"></i>Tuned (nested CV)</span></div>
+      <div class="chart" id="c-tune"></div>
+      <p class="cap">XGBoost's defaults overfit badly and gain the most. After tuning, all five boosting libraries end within 0.003 AUC of each other.</p></div>
+    <div class="card"><h3>Extra features did not help</h3><div class="chart" id="c-feat"></div>
+      <p class="cap">CatBoost with the 6 raw sensors vs adding the 16 engineered columns shipped with the data (#14). Raw sensors are as good or better.</p></div>
+  </div>
+</section>
+
+<section id="why" aria-labelledby="h-why">
+  <div class="sec-head"><span class="eyebrow">4 · Why everything plateaus</span><h2 id="h-why">The signal is weak and adds up sensor by sensor</h2></div>
+  <div class="grid2">
+    <div class="card"><h3>Estimated ceiling</h3><div class="chart" id="c-ceiling"></div>
+      <p class="cap">If our best model's probabilities were exactly right, simulating new labels from them gives an AUC of about 0.707. Our models already reach 0.704 in CV and 0.71 on test, so little room is left.</p></div>
+    <div class="card"><h3>Evidence</h3>
+      <div class="tbl-wrap" style="border:0"><table id="t-why" class="wraptbl"></table></div></div>
+  </div>
+  <p class="callout"><b>What this means.</b> Gradient boosting is strong because it finds interactions between features. Here there are none to find, so a simple additive model does just as well. More tuning or bigger models will not move the score; better data would.</p>
+</section>
+
+<section id="learned" aria-labelledby="h-learned">
+  <div class="sec-head"><span class="eyebrow">5 · What the model learned</span><h2 id="h-learned">How each sensor moves the risk</h2>
+  <p>The GAM adds one curve per sensor. Each curve is measured against an engine with a typical (median) reading: above the zero line the odds of "Needs Maintenance" are higher, below it lower. The y-axis is the change in log-odds; hover to see it as an odds multiplier. Shaded bands are 95% intervals, and the vertical scale differs per panel.</p></div>
+  <div class="card"><div class="chart" id="c-shapes"></div></div>
+  <div class="grid2">
+    <div class="card"><h3>Importance: AUC lost when a sensor is shuffled</h3>
+      <div class="legend"><span><i class="dot" style="background:var(--accent)"></i>GAM</span><span><i class="dot" style="background:var(--maint)"></i>CatBoost (#16)</span></div>
+      <div class="chart" id="c-perm"></div>
+      <p class="cap">Both models agree on the order. XGBoost and LightGBM give the identical ranking too (#16).</p></div>
+    <div class="card"><h3>In plain words</h3><ul id="plain" style="margin:0;padding-left:20px;display:grid;gap:8px;font-size:0.92rem"></ul></div>
+  </div>
+</section>
+
+<section id="test" aria-labelledby="h-test">
+  <div class="sec-head"><span class="eyebrow">6 · Test set</span><h2 id="h-test">On unseen engines the top models cannot be told apart</h2>
+  <p>Final models were refit on all development data and scored on the 2,931 held-out engines. Bars are 95% bootstrap intervals (2,000 resamples).</p></div>
+  <div class="grid2">
+    <div class="card"><h3>Test ROC AUC</h3><div class="chart" id="c-test"></div>
+      <p class="note">Test set looked at three times in total (#18 and two improvement rounds). Every model was chosen on development data only.</p></div>
+    <div class="card"><h3>ROC curve on the test set</h3>
+      <div class="legend"><span><i style="background:var(--accent)"></i>GAM</span><span><i style="background:var(--maint)"></i>CatBoost tuned</span><span><i style="background:var(--muted)"></i>Random guess</span></div>
+      <div class="chart" id="c-roc"></div>
+      <p class="cap">The two curves lie on top of each other. Other models are not drawn because they overlap too.</p></div>
+  </div>
+</section>
+
+<section id="use" aria-labelledby="h-use">
+  <div class="sec-head"><span class="eyebrow">7 · Using the model</span><h2 id="h-use">Turning scores into inspection decisions</h2>
+  <p>All numbers below use out-of-fold GAM predictions on development data, so no engine was scored by a model that had seen it.</p></div>
+  <div class="grid2">
+    <div class="card"><h3>Inspect the top k% by risk</h3>
+      <div class="legend"><span><i class="dot" style="background:var(--accent)"></i>Model precision</span><span><i style="background:var(--muted)"></i>Random picking (63%)</span></div>
+      <div class="chart" id="c-topk"></div>
+      <p class="cap">Inspecting the riskiest 10% finds a real maintenance case 9 times in 10, against about 6 in 10 at random. The lift shrinks as more engines are inspected.</p></div>
+    <div class="card"><h3>Choosing a threshold</h3>
+      <div class="legend"><span><i style="background:var(--accent)"></i>Precision</span><span><i style="background:var(--maint)"></i>Recall</span><span><i style="background:var(--s3)"></i>Balanced accuracy</span></div>
+      <div class="chart" id="c-thr"></div>
+      <p class="cap">At 0.50 the model flags 76% of engines and finds 84% of maintenance cases. Balanced accuracy peaks near 0.60 to 0.65.</p></div>
+  </div>
+  <div class="grid2">
+    <div class="card"><h3>When does the model save money?</h3><div class="tbl-wrap" style="border:0"><table id="t-cost" class="wraptbl"></table></div>
+      <p class="cap">Costs are assumptions (the data has none): an unneeded inspection costs 1, a missed fault costs r. The model only clearly beats "inspect everything" when a miss costs about as much as an inspection.</p></div>
+    <div class="card"><h3>Probabilities are trustworthy</h3><div class="chart" id="c-cal"></div>
+      <p class="cap" id="cal-cap"></p></div>
+  </div>
+</section>
+
+<section id="next" aria-labelledby="h-next">
+  <div class="sec-head"><span class="eyebrow">8 · Limits and next steps</span><h2 id="h-next">What to keep in mind</h2></div>
+  <div class="grid2">
+    <div class="card"><h3>Limitations</h3><ul style="margin:0;padding-left:20px;display:grid;gap:8px;font-size:0.92rem">
+      <li><b>Unknown origin and label.</b> The data's source and the meaning of "Needs Maintenance" are not documented. The near-zero correlations suggest synthetic data.</li>
+      <li><b>No engine ID or time.</b> We cannot group readings by engine or follow trends, so scores may be optimistic if one engine appears in both train and test.</li>
+      <li><b>No cost data.</b> The money analysis uses assumed costs.</li>
+      <li><b>One test set, several looks.</b> Fine for reporting, but it should not be used again for choosing models.</li>
+    </ul></div>
+    <div class="card"><h3>Next steps</h3><ul style="margin:0;padding-left:20px;display:grid;gap:8px;font-size:0.92rem">
+      <li>Adopt the GAM (or the spline logistic regression) as the final model and update the report section from #18.</li>
+      <li>Finish #17 (other model families) and #6 (data exploration write-up); coordinate with the improvement experiments, which already cover several #17 models.</li>
+      <li>Ask whether better data exists: engine IDs and timestamps, a documented label, real inspection and failure costs.</li>
+      <li>Merge the improvement work (<span class="mono">experiments/</span>) through a reviewed pull request.</li>
+    </ul></div>
+  </div>
+</section>
+
+<section id="work" aria-labelledby="h-work">
+  <div class="sec-head"><span class="eyebrow">9 · Work log</span><h2 id="h-work">Who did what</h2>
+  <p>GitHub issues and pull requests in <span class="mono">cynthia-0316/smartops</span>.</p></div>
+  <div class="tbl-wrap"><table id="t-work"></table></div>
+</section>
+
+<section id="figures" aria-labelledby="h-fig">
+  <div class="sec-head"><span class="eyebrow">10 · Figure gallery</span><h2 id="h-fig">Every figure saved in the repository</h2>
+  <p>From <span class="mono">reports/figures/</span>, as produced by each notebook. Select a figure to enlarge it.</p></div>
+  <div class="gallery" id="gallery"></div>
+  <dialog id="zoom"><img id="zoom-img" alt=""></dialog>
+</section>
+
+<section id="all" aria-labelledby="h-all">
+  <div class="sec-head"><span class="eyebrow">11 · All runs</span><h2 id="h-all">Every model configuration we scored</h2>
+  <p>Development-set cross-validation (5 folds × 3 repeats). Select a column heading to sort.</p></div>
+  <div class="controls"><input type="search" id="q" placeholder="Filter by name or family" aria-label="Filter runs">
+    <div class="seg" role="group" aria-label="Filter runs"><button type="button" id="f-all" aria-pressed="true">All</button><button type="button" id="f-honest" aria-pressed="false">Honest only</button></div>
+    <span class="note" id="run-count" style="font-size:0.82rem;color:var(--muted)"></span></div>
+  <div class="tbl-wrap" style="max-height:560px"><table id="t-all"></table></div>
+</section>
+
+<footer>
+  <span>Built from <span class="mono">results/model_results.csv</span>, <span class="mono">results/test_*.csv</span>, <span class="mono">experiments/log.csv</span> and the notebooks in <span class="mono">notebooks/</span>.</span>
+  <span>Numbers are generated by <span class="mono">experiments/collect_report_data.py</span>; rebuild with <span class="mono">experiments/build_report.py</span>.</span>
+</footer>
+</div>
+<div class="tip" id="tip" hidden></div>
+
+<script>
+const D = __DATA__;
+const $ = s => document.querySelector(s);
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const f3 = v => v.toFixed(3), f4 = v => v.toFixed(4), pct = (v, d = 0) => (v * 100).toFixed(d) + '%';
+const NS = 'http://www.w3.org/2000/svg';
+function el(tag, attrs = {}, parent) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; }
+function txt(parent, x, y, s, attrs = {}) { const t = el('text', Object.assign({ x, y, fill: 'var(--ink-2)', 'font-size': 12 }, attrs), parent); t.textContent = s; return t; }
+function svgIn(node, w, h) { node.innerHTML = ''; return el('svg', { width: w, height: h, viewBox: `0 0 ${w} ${h}`, role: 'img' }, node); }
+const lin = (d0, d1, r0, r1) => v => r0 + (v - d0) / (d1 - d0) * (r1 - r0);
+const tip = $('#tip');
+function hover(target, html) {
+  target.style.cursor = 'default';
+  target.addEventListener('mousemove', e => { tip.innerHTML = html; tip.hidden = false;
+    const x = Math.min(e.clientX + 14, innerWidth - tip.offsetWidth - 8); tip.style.left = x + 'px'; tip.style.top = (e.clientY + 14) + 'px'; });
+  target.addEventListener('mouseleave', () => tip.hidden = true);
+}
+function ticks(a, b, n) { const step = (b - a) / n; return Array.from({ length: n + 1 }, (_, i) => a + i * step); }
+
+/* ---------- tiles ---------- */
+const gam = D.test.find(t => t.name.startsWith('GAM')), cb = D.test.find(t => t.name === 'CatBoost tuned');
+const honestGam = D.leaderboard.find(r => r.name === 'pygam_ns20');
+const tiles = [
+  { v: f3(gam.auc), l: 'Test ROC AUC of the recommended GAM (95% CI ' + f3(gam.lo) + '–' + f3(gam.hi) + ')', key: true },
+  { v: '≈' + f3(D.facts.ceiling), l: 'Estimated best possible AUC for this data' },
+  { v: (D.facts.n_experiments + D.facts.n_team_runs), l: 'Model configurations scored with the shared protocol' },
+  { v: pct(D.dataset.pos_share), l: 'Engines labelled "Needs Maintenance"' },
+];
+$('#tiles').innerHTML = tiles.map(t => `<div class="tile${t.key ? ' key' : ''}"><span class="v num">${t.v}</span><span class="l">${t.l}</span></div>`).join('');
+$('#gen-date').textContent = 'Results as of ' + new Date(document.lastModified).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+
+/* ---------- charts ---------- */
+function stackBar(node, parts) {
+  node.innerHTML = ''; const holder = document.createElement('div'); node.appendChild(holder);
+  const w = node.clientWidth, s = svgIn(holder, w, 34); let x = 0; const tot = parts.reduce((a, p) => a + p.v, 0);
+  parts.forEach((p, i) => { const pw = p.v / tot * w - (i < parts.length - 1 ? 2 : 0);
+    const r = el('rect', { x, y: 2, width: Math.max(pw, 0), height: 30, rx: 4, fill: p.c }, s); hover(r, `<b>${p.l}</b><br>${p.v.toLocaleString()} rows (${pct(p.v / tot, 1)})`);
+    x += p.v / tot * w; });
+  const lg = document.createElement('div'); lg.className = 'legend'; lg.style.marginTop = '8px';
+  lg.innerHTML = parts.map(p => `<span><i class="dot" style="background:${p.c}"></i><b style="color:var(--ink);font-weight:600">${p.l}</b> <span class="num">${p.v.toLocaleString()} (${pct(p.v / tot, 1)})</span></span>`).join('');
+  node.appendChild(lg);
+}
+function hbars(node, rows, o) {
+  const w = node.clientWidth, lw = o.lw || Math.min(150, w * 0.38), rh = o.rh || 26, h = rows.length * rh + 26;
+  const s = svgIn(node, w, h), x = lin(o.d0, o.d1, lw, w - (o.pad || 54));
+  ticks(o.d0, o.d1, o.nt || 4).forEach(t => { el('line', { x1: x(t), x2: x(t), y1: 0, y2: h - 22, stroke: 'var(--grid)' }, s); txt(s, x(t), h - 6, o.tf ? o.tf(t) : f3(t), { 'text-anchor': 'middle', 'font-size': 11, fill: 'var(--muted)' }); });
+  rows.forEach((r, i) => { const y = i * rh + 4, x0 = x(o.base ?? o.d0);
+    txt(s, lw - 8, y + rh / 2 + 1, r.label, { 'text-anchor': 'end', 'dominant-baseline': 'middle', fill: 'var(--ink)' });
+    const bw = Math.max(x(r.v) - x0, 1); const b = el('rect', { x: x0, y: y + 4, width: bw, height: rh - 12, rx: 3, fill: r.c || 'var(--accent)' }, s);
+    if (r.sd) el('line', { x1: x(r.v - r.sd), x2: x(r.v + r.sd), y1: y + rh / 2 - 2, y2: y + rh / 2 - 2, stroke: 'var(--ink-2)', 'stroke-width': 1.5 }, s);
+    txt(s, x0 + bw + (r.sd ? x(r.v + r.sd) - x(r.v) : 0) + 6, y + rh / 2 + 1, r.vl, { 'dominant-baseline': 'middle', 'font-size': 11.5, fill: 'var(--ink-2)', class: 'num' });
+    hover(b, r.tip); });
+}
+function dots(node, rows, o) {
+  const w = node.clientWidth, narrow = w < 560, lw = narrow ? Math.min(200, w * 0.5) : 230, rh = 24;
+  let h = 30; rows.forEach(r => h += r.group ? 26 : rh);
+  const s = svgIn(node, w, h), x = lin(o.d0, o.d1, lw, w - 18);
+  ticks(o.d0, o.d1, o.nt || 5).forEach(t => { el('line', { x1: x(t), x2: x(t), y1: 0, y2: h - 24, stroke: 'var(--grid)' }, s); txt(s, x(t), h - 6, o.tf ? o.tf(t) : f3(t), { 'text-anchor': 'middle', 'font-size': 11, fill: 'var(--muted)' }); });
+  if (o.ref != null) { el('line', { x1: x(o.ref), x2: x(o.ref), y1: 0, y2: h - 24, stroke: 'var(--ink-2)', 'stroke-dasharray': '4 3' }, s);
+    txt(s, x(o.ref) - 4, 10, o.refLabel, { 'text-anchor': 'end', 'font-size': 11, fill: 'var(--ink-2)' }); }
+  let y = 14;
+  rows.forEach(r => {
+    if (r.group) { txt(s, 0, y + 15, r.group.toUpperCase(), { 'font-size': 10.5, fill: 'var(--muted)', 'letter-spacing': '0.08em', 'font-family': 'var(--f-mono)' }); y += 26; return; }
+    const cy = y + rh / 2; const mc = Math.floor((lw - 12) / (r.hl ? 6.8 : 6.1)); const lab = r.label.length > mc ? r.label.slice(0, mc - 1) + '…' : r.label;
+    txt(s, lw - 10, cy + 1, lab, { 'text-anchor': 'end', 'dominant-baseline': 'middle', fill: r.hl ? 'var(--ink)' : 'var(--ink-2)', 'font-weight': r.hl ? 600 : 400 });
+    if (r.lo != null) el('line', { x1: x(Math.max(r.lo, o.d0)), x2: x(Math.min(r.hi, o.d1)), y1: cy, y2: cy, stroke: r.c || 'var(--muted)', 'stroke-width': 2, 'stroke-linecap': 'round' }, s);
+    const c = el('circle', { cx: x(r.v), cy, r: r.hl ? 6 : 5, fill: r.c || 'var(--muted)', stroke: 'var(--surface)', 'stroke-width': 2 }, s);
+    const hit = el('rect', { x: 0, y, width: w, height: rh, fill: 'transparent' }, s); hover(hit, r.tip); y += rh;
+  });
+}
+function lines(node, series, o) {
+  const w = node.clientWidth, h = o.h || 240, m = { l: 44, r: 14, t: 10, b: 30 }, s = svgIn(node, w, h);
+  const x = lin(o.x0, o.x1, m.l, w - m.r), y = lin(o.y0, o.y1, h - m.b, m.t);
+  ticks(o.y0, o.y1, o.ny || 4).forEach(t => { el('line', { x1: m.l, x2: w - m.r, y1: y(t), y2: y(t), stroke: 'var(--grid)' }, s); txt(s, m.l - 6, y(t) + 4, o.yf ? o.yf(t) : t.toFixed(1), { 'text-anchor': 'end', 'font-size': 11, fill: 'var(--muted)' }); });
+  ticks(o.x0, o.x1, o.nx || 5).forEach(t => txt(s, x(t), h - 10, o.xf ? o.xf(t) : t.toFixed(2), { 'text-anchor': 'middle', 'font-size': 11, fill: 'var(--muted)' }));
+  if (o.xlab) txt(s, w - m.r, h - 10 - 14, o.xlab, { 'text-anchor': 'end', 'font-size': 11, fill: 'var(--muted)' });
+  (o.refs || []).forEach(r => el('line', Object.assign({ stroke: 'var(--ink-2)', 'stroke-dasharray': '4 3' }, r.line(x, y)), s));
+  series.forEach(se => { const d = se.x.map((v, i) => (i ? 'L' : 'M') + x(v).toFixed(1) + ',' + y(se.y[i]).toFixed(1)).join('');
+    el('path', { d, fill: 'none', stroke: se.c, 'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-dasharray': se.dash || '' }, s);
+    if (se.pts) se.x.forEach((v, i) => el('circle', { cx: x(v), cy: y(se.y[i]), r: 3.5, fill: se.c, stroke: 'var(--surface)', 'stroke-width': 1.5 }, s)); });
+  if (o.hoverX) { const guide = el('line', { y1: m.t, y2: h - m.b, stroke: 'var(--axis)', visibility: 'hidden' }, s);
+    const hit = el('rect', { x: m.l, y: m.t, width: w - m.l - m.r, height: h - m.t - m.b, fill: 'transparent' }, s);
+    hit.addEventListener('mousemove', e => { const bx = s.getBoundingClientRect(); const xv = o.x0 + (e.clientX - bx.left - m.l) / (w - m.l - m.r) * (o.x1 - o.x0);
+      const i = series[0].x.reduce((bi, v, j) => Math.abs(v - xv) < Math.abs(series[0].x[bi] - xv) ? j : bi, 0);
+      guide.setAttribute('x1', x(series[0].x[i])); guide.setAttribute('x2', x(series[0].x[i])); guide.setAttribute('visibility', 'visible');
+      tip.innerHTML = o.hoverX(i); tip.hidden = false; tip.style.left = Math.min(e.clientX + 14, innerWidth - tip.offsetWidth - 8) + 'px'; tip.style.top = (e.clientY + 14) + 'px'; });
+    hit.addEventListener('mouseleave', () => { tip.hidden = true; guide.setAttribute('visibility', 'hidden'); }); }
+}
+
+function drawAll() {
+  const ds = D.dataset;
+  stackBar($('#c-balance'), [{ l: 'Normal', v: ds.neg, c: 'var(--normal)' }, { l: 'Needs Maintenance', v: ds.pos, c: 'var(--maint)' }]);
+  stackBar($('#c-split'), [{ l: 'Train', v: ds.splits.train, c: 'var(--accent)' }, { l: 'Val', v: ds.splits.val, c: 'var(--s3)' }, { l: 'Test', v: ds.splits.test, c: 'var(--muted)' }]);
+
+  // distributions small multiples
+  const box = $('#c-dists'); box.innerHTML = ''; const W = box.clientWidth, cols = W < 560 ? 1 : W < 860 ? 2 : 3, cw = (W - (cols - 1) * 16) / cols;
+  const grid = document.createElement('div'); grid.style.cssText = `display:grid;grid-template-columns:repeat(${cols},1fr);gap:16px`; box.appendChild(grid);
+  D.sensors.forEach(sn => { const cell = document.createElement('div'); cell.style.minWidth = 0; grid.appendChild(cell);
+    const t = document.createElement('div'); t.style.cssText = 'font-size:0.84rem;font-weight:600;margin-bottom:2px'; t.textContent = `${sn.name} (${sn.unit})`; cell.appendChild(t);
+    const c = document.createElement('div'); c.className = 'chart'; cell.appendChild(c);
+    const ymax = Math.max(...sn.h0, ...sn.h1) * 1.08, x0 = sn.bins[0], x1 = sn.bins[sn.bins.length - 1];
+    const dec = x1 - x0 > 100 ? 0 : x1 - x0 > 10 ? 0 : 1;
+    lines(c, [{ x: sn.bins, y: sn.h0, c: 'var(--normal)' }, { x: sn.bins, y: sn.h1, c: 'var(--maint)' }],
+      { x0, x1, y0: 0, y1: ymax, h: 150, ny: 2, nx: 3, yf: () => '', xf: v => v.toFixed(dec),
+        hoverX: i => `<b>${sn.name} ≈ ${sn.bins[i].toFixed(dec + 1)} ${sn.unit}</b><br>Normal density ${sn.h0[i].toPrecision(3)}<br>Needs Maintenance density ${sn.h1[i].toPrecision(3)}` }); });
+
+  // univariate AUC
+  const uni = [...D.sensors].sort((a, b) => b.auc - a.auc);
+  hbars($('#c-uni'), uni.map(s => ({ label: s.name, v: s.auc, vl: f3(s.auc) + (s.dir === '-' ? ' ↓' : ' ↑'), tip: `<b>${s.name}</b><br>AUC alone ${f3(s.auc)}<br>${s.dir === '-' ? 'Lower' : 'Higher'} readings → more "Needs Maintenance"<br>Mean: Normal ${s.mean0.toFixed(2)} vs Needs Maint. ${s.mean1.toFixed(2)} ${s.unit}` })),
+    { d0: 0.5, d1: 0.7, base: 0.5, nt: 4 });
+
+  // correlation heatmap
+  const cn = D.corr.names, m = D.corr.m, cbox = $('#c-corr'), W2 = cbox.clientWidth, lw = Math.min(118, W2 * 0.3), cs = Math.min(52, (W2 - lw) / 6), h2 = lw * 0.15 + cs * 6 + 70;
+  const s2 = svgIn(cbox, W2, cs * 6 + 76), short = ['RPM', 'Oil P', 'Fuel P', 'Cool P', 'Oil T', 'Cool T'];
+  const neg = css('--div-neg'), mid = css('--div-mid'), pos = css('--div-pos');
+  const mix = (a, b, t) => { const p = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)); const A = p(a), B = p(b); return `rgb(${A.map((v, i) => Math.round(v + (B[i] - v) * t)).join(',')})`; };
+  cn.forEach((r, i) => { txt(s2, lw - 8, i * cs + cs / 2 + 4, short[i], { 'text-anchor': 'end', fill: 'var(--ink)' });
+    txt(s2, lw + i * cs + cs / 2, cs * 6 + 18, short[i], { 'text-anchor': 'middle', 'font-size': 11, fill: 'var(--ink-2)' });
+    cn.forEach((c, j) => { const v = m[i][j], col = i === j ? 'var(--grid)' : (v < 0 ? mix(mid, neg, Math.min(-v / 0.3, 1)) : mix(mid, pos, Math.min(v / 0.3, 1)));
+      const rc = el('rect', { x: lw + j * cs + 1, y: i * cs + 1, width: cs - 2, height: cs - 2, rx: 3, fill: col }, s2);
+      txt(s2, lw + j * cs + cs / 2, i * cs + cs / 2 + 4, i === j ? '1' : v.toFixed(2).replace('0.', '.'), { 'text-anchor': 'middle', 'font-size': 10.5, fill: 'var(--ink)', class: 'num' });
+      hover(rc, `<b>${r} × ${c}</b><br>Spearman ${v.toFixed(3)}`); }); });
+  txt(s2, lw, cs * 6 + 44, 'Colour scale saturates at ±0.30 so small values stay visible', { 'font-size': 11, fill: 'var(--muted)' });
+
+  // outliers
+  hbars($('#c-out'), [...D.sensors].sort((a, b) => b.iqr_share - a.iqr_share).map(s => ({ label: s.name, v: s.iqr_share, vl: `${s.iqr_out.toLocaleString()} (${pct(s.iqr_share, 1)})`,
+    tip: `<b>${s.name}</b><br>${s.iqr_out.toLocaleString()} rows outside 1.5×IQR<br>Range ${s.min.toFixed(2)} to ${s.max.toFixed(2)} ${s.unit}` })), { d0: 0, d1: 0.15, nt: 3, tf: t => pct(t), pad: 90 });
+
+  // leaderboard
+  drawBoard();
+  // tuning dumbbell
+  const L = n => D.leaderboard.find(r => r.name === n);
+  const tune = [['XGBoost', 'XGBoost', 'XGBoost tuned'], ['LightGBM', 'LightGBM', 'LightGBM tuned'], ['CatBoost', 'CatBoost', 'CatBoost tuned'],
+    ['HistGradientBoosting', 'HistGradientBoosting (sklearn)', 'HistGradientBoosting (sklearn) tuned'], ['GradientBoosting', 'GradientBoosting (sklearn)', 'GradientBoosting (sklearn) tuned']]
+    .map(([l, a, b]) => ({ l, a: L(a), b: L(b) })).filter(r => r.a && r.b);
+  { const nb = $('#c-tune'), w = nb.clientWidth, lw = Math.min(150, w * 0.4), rh = 30, h = tune.length * rh + 26, s = svgIn(nb, w, h), x = lin(0.655, 0.71, lw, w - 50);
+    ticks(0.66, 0.71, 5).forEach(t => { el('line', { x1: x(t), x2: x(t), y1: 0, y2: h - 22, stroke: 'var(--grid)' }, s); txt(s, x(t), h - 6, t.toFixed(2), { 'text-anchor': 'middle', 'font-size': 11, fill: 'var(--muted)' }); });
+    tune.forEach((r, i) => { const cy = i * rh + rh / 2 + 2; txt(s, lw - 10, cy + 4, r.l, { 'text-anchor': 'end', fill: 'var(--ink)' });
+      el('line', { x1: x(r.a.auc), x2: x(r.b.auc), y1: cy, y2: cy, stroke: 'var(--axis)', 'stroke-width': 2 }, s);
+      el('circle', { cx: x(r.a.auc), cy, r: 5, fill: 'var(--muted)', stroke: 'var(--surface)', 'stroke-width': 2 }, s);
+      el('circle', { cx: x(r.b.auc), cy, r: 5.5, fill: 'var(--accent)', stroke: 'var(--surface)', 'stroke-width': 2 }, s);
+      txt(s, x(r.b.auc) + 9, cy + 4, '+' + (r.b.auc - r.a.auc).toFixed(3), { 'font-size': 11.5, class: 'num' });
+      hover(el('rect', { x: 0, y: cy - rh / 2, width: w, height: rh, fill: 'transparent' }, s), `<b>${r.l}</b><br>Defaults ${f4(r.a.auc)}<br>Tuned (nested CV) ${f4(r.b.auc)}`); }); }
+  // feature sets
+  const fs = D.leaderboard.filter(r => r.name.startsWith('CatBoost (params from #13)')).map(r => ({ label: (r.name.match(/\[(.*)\]/) || [, 'raw (6 sensors)'])[1].replace('raw+own', 'raw + 4 own').replace('all', 'all 22 columns'), v: r.auc, sd: r.std, vl: f4(r.auc), tip: `<b>${r.name}</b><br>AUC ${f4(r.auc)} ± ${f4(r.std)}` }));
+  hbars($('#c-feat'), fs.sort((a, b) => b.v - a.v).map((r, i) => Object.assign(r, { c: i === 0 ? 'var(--accent)' : 'var(--muted)' })), { d0: 0.68, d1: 0.715, base: 0.68, nt: 3, lw: 170, pad: 90 });
+
+  // ceiling
+  dots($('#c-ceiling'), [
+    { label: 'Estimated ceiling', v: D.facts.ceiling, lo: D.facts.ceiling - 2 * D.facts.ceiling_sd, hi: D.facts.ceiling + 2 * D.facts.ceiling_sd, c: 'var(--ink-2)', tip: `<b>Estimated ceiling</b><br>${f4(D.facts.ceiling)} (±2 sd ${f4(2 * D.facts.ceiling_sd)})` },
+    { label: 'GAM, test set', v: gam.auc, lo: gam.lo, hi: gam.hi, c: 'var(--accent)', hl: true, tip: `<b>GAM on test</b><br>${f4(gam.auc)} (${f3(gam.lo)}–${f3(gam.hi)})` },
+    { label: 'GAM, cross-validation', v: honestGam.auc, lo: honestGam.auc - honestGam.std, hi: honestGam.auc + honestGam.std, c: 'var(--accent)', tip: `<b>GAM CV</b><br>${f4(honestGam.auc)} ± ${f4(honestGam.std)}` },
+    { label: 'Linear logistic regression', v: L('lr_linear').auc, lo: L('lr_linear').auc - L('lr_linear').std, hi: L('lr_linear').auc + L('lr_linear').std, tip: `<b>Linear LR</b><br>${f4(L('lr_linear').auc)}` },
+    { label: 'Engine RPM alone', v: D.sensors[0].auc, tip: `<b>RPM alone</b><br>${f4(D.sensors[0].auc)}` },
+  ], { d0: 0.66, d1: 0.735, nt: 5 });
+
+  // GAM shapes
+  const sb = $('#c-shapes'); sb.innerHTML = ''; const SW = sb.clientWidth, sc = SW < 560 ? 1 : SW < 860 ? 2 : 3;
+  const sg = document.createElement('div'); sg.style.cssText = `display:grid;grid-template-columns:repeat(${sc},1fr);gap:18px`; sb.appendChild(sg);
+  D.gam_shapes.forEach(sh0 => { const sn = D.sensors.find(s => s.name === sh0.name);
+    const mi = sh0.x.reduce((b, v, i) => Math.abs(v - sn.median) < Math.abs(sh0.x[b] - sn.median) ? i : b, 0), off = sh0.y[mi];
+    const sh = { name: sh0.name, x: sh0.x, y: sh0.y.map(v => v - off), lo: sh0.lo.map(v => v - off), hi: sh0.hi.map(v => v - off) };
+    const cell = document.createElement('div'); cell.style.minWidth = 0; sg.appendChild(cell);
+    const t = document.createElement('div'); t.style.cssText = 'font-size:0.84rem;font-weight:600'; t.textContent = `${sh.name} (${sn.unit})`; cell.appendChild(t);
+    const c = document.createElement('div'); c.className = 'chart'; cell.appendChild(c);
+    const lo = Math.min(...sh.lo, -0.3), hi = Math.max(...sh.hi, 0.3), x0 = sh.x[0], x1 = sh.x[sh.x.length - 1], dec = x1 - x0 > 50 ? 0 : 1;
+    lines(c, [{ x: sh.x, y: sh.y, c: 'var(--accent)' }], { x0, x1, y0: lo, y1: hi, h: 160, ny: 2, nx: 3, xf: v => v.toFixed(dec), yf: v => (v > 0 ? '+' : '') + v.toFixed(1),
+      refs: [{ line: (x, y) => ({ x1: x(x0), x2: x(x1), y1: y(0), y2: y(0) }) }],
+      hoverX: i => `<b>${sh.name} = ${sh.x[i].toFixed(dec + 1)} ${sn.unit}</b><br>Effect on log-odds ${(sh.y[i] > 0 ? '+' : '') + sh.y[i].toFixed(2)}<br>Odds × ${Math.exp(sh.y[i]).toFixed(2)} (95% ${Math.exp(sh.lo[i]).toFixed(2)}–${Math.exp(sh.hi[i]).toFixed(2)})` });
+    const svg = c.querySelector('svg'), xs = lin(x0, x1, 44, c.clientWidth - 14), ys = lin(lo, hi, 130, 10);
+    const band = el('path', { d: sh.x.map((v, i) => (i ? 'L' : 'M') + xs(v) + ',' + ys(sh.hi[i])).join('') + sh.x.slice().reverse().map((v, i) => 'L' + xs(v) + ',' + ys(sh.lo[sh.x.length - 1 - i])).join('') + 'Z', fill: 'var(--accent)', opacity: 0.15 });
+    svg.insertBefore(band, svg.querySelector('path')); });
+
+  // permutation importance (grouped)
+  { const nb = $('#c-perm'), w = nb.clientWidth, lw = Math.min(140, w * 0.36), rh = 34, rows = D.perm_gam.slice().sort((a, b) => b.mean - a.mean), h = rows.length * rh + 26, s = svgIn(nb, w, h), x = lin(0, 0.16, lw, w - 56);
+    ticks(0, 0.16, 4).forEach(t => { el('line', { x1: x(t), x2: x(t), y1: 0, y2: h - 22, stroke: 'var(--grid)' }, s); txt(s, x(t), h - 6, t.toFixed(2), { 'text-anchor': 'middle', 'font-size': 11, fill: 'var(--muted)' }); });
+    rows.forEach((r, i) => { const y = i * rh + 4, c2 = D.perm_catboost.find(p => p.name === r.name);
+      txt(s, lw - 8, y + rh / 2, r.name, { 'text-anchor': 'end', 'dominant-baseline': 'middle', fill: 'var(--ink)' });
+      const b1 = el('rect', { x: x(0), y: y + 3, width: Math.max(x(r.mean) - x(0), 1), height: 11, rx: 3, fill: 'var(--accent)' }, s);
+      const b2 = el('rect', { x: x(0), y: y + 16, width: Math.max(x(c2.mean) - x(0), 1), height: 11, rx: 3, fill: 'var(--maint)' }, s);
+      txt(s, x(Math.max(r.mean, c2.mean)) + 6, y + rh / 2, r.mean.toFixed(3), { 'dominant-baseline': 'middle', 'font-size': 11.5, class: 'num' });
+      hover(b1, `<b>${r.name} · GAM</b><br>AUC drop ${r.mean.toFixed(4)} ± ${r.std.toFixed(4)}`); hover(b2, `<b>${r.name} · CatBoost</b><br>AUC drop ${c2.mean.toFixed(4)}`); }); }
+
+  // test results
+  const T = D.test.slice().sort((a, b) => b.auc - a.auc);
+  dots($('#c-test'), T.map(t => ({ label: t.name, v: t.auc, lo: t.lo, hi: t.hi, c: t.name.startsWith('GAM') ? 'var(--accent)' : 'var(--muted)', hl: t.name.startsWith('GAM'),
+    tip: `<b>${t.name}</b><br>Test AUC ${f4(t.auc)}<br>95% CI ${f3(t.lo)}–${f3(t.hi)}<br>Brier ${f4(t.brier)}<br>Scored by ${t.by}` })), { d0: 0.68, d1: 0.735, nt: 5 });
+  lines($('#c-roc'), [{ x: [0, 1], y: [0, 1], c: 'var(--muted)', dash: '4 3' }, { x: cb.fpr, y: cb.tpr, c: 'var(--maint)' }, { x: gam.fpr, y: gam.tpr, c: 'var(--accent)' }],
+    { x0: 0, x1: 1, y0: 0, y1: 1, h: 260, xf: v => v.toFixed(1), yf: v => v.toFixed(1), xlab: 'False positive rate →' });
+
+  // top-k
+  { const rows = D.topk.filter(r => r.k < 100), nb = $('#c-topk'), w = nb.clientWidth, h = 230, m = { l: 44, r: 10, t: 12, b: 30 }, s = svgIn(nb, w, h);
+    const bw = (w - m.l - m.r) / rows.length, y = lin(0.5, 1, h - m.b, m.t);
+    ticks(0.5, 1, 5).forEach(t => { el('line', { x1: m.l, x2: w - m.r, y1: y(t), y2: y(t), stroke: 'var(--grid)' }, s); txt(s, m.l - 6, y(t) + 4, pct(t), { 'text-anchor': 'end', 'font-size': 11, fill: 'var(--muted)' }); });
+    rows.forEach((r, i) => { const x0 = m.l + i * bw + 4, b = el('rect', { x: x0, y: y(r.precision), width: bw - 8, height: y(0.5) - y(r.precision), rx: 4, fill: 'var(--accent)' }, s);
+      txt(s, x0 + (bw - 8) / 2, y(r.precision) - 6, pct(r.precision), { 'text-anchor': 'middle', 'font-size': 11.5, fill: 'var(--ink)', class: 'num' });
+      txt(s, x0 + (bw - 8) / 2, h - 10, 'top ' + r.k + '%', { 'text-anchor': 'middle', 'font-size': 11, fill: 'var(--muted)' });
+      hover(b, `<b>Inspect the top ${r.k}%</b><br>Precision ${pct(r.precision, 1)} (random 63%)<br>Lift ${(r.precision / D.dataset.pos_share).toFixed(2)}×<br>Finds ${pct(r.caught, 1)} of all maintenance cases`); });
+    el('line', { x1: m.l, x2: w - m.r, y1: y(D.dataset.pos_share), y2: y(D.dataset.pos_share), stroke: 'var(--ink-2)', 'stroke-dasharray': '4 3' }, s); }
+  // thresholds
+  const th = D.thresholds;
+  lines($('#c-thr'), [{ x: th.map(r => r.t), y: th.map(r => r.precision), c: 'var(--accent)', pts: 1 }, { x: th.map(r => r.t), y: th.map(r => r.recall), c: 'var(--maint)', pts: 1 }, { x: th.map(r => r.t), y: th.map(r => r.bal_acc), c: 'var(--s3)', pts: 1 }],
+    { x0: 0.4, x1: 0.85, y0: 0, y1: 1, h: 240, nx: 3, xf: v => v.toFixed(2), yf: v => pct(v), xlab: 'Threshold →',
+      hoverX: i => `<b>Threshold ${th[i].t.toFixed(2)}</b><br>Flags ${pct(th[i].flagged)} of engines<br>Precision ${pct(th[i].precision, 1)} · Recall ${pct(th[i].recall, 1)}<br>Balanced accuracy ${pct(th[i].bal_acc, 1)}` });
+  // calibration
+  const cal = D.calibration;
+  lines($('#c-cal'), [{ x: [0.2, 1], y: [0.2, 1], c: 'var(--muted)', dash: '4 3' }, { x: cal.map(r => r.pred), y: cal.map(r => r.obs), c: 'var(--accent)', pts: 1 }],
+    { x0: 0.2, x1: 1, y0: 0.2, y1: 1, h: 240, nx: 4, ny: 4, xf: v => pct(v), yf: v => pct(v), xlab: 'Predicted probability →' });
+  { const c = $('#c-cal'); const pts = c.querySelectorAll('circle'); pts.forEach((p, i) => hover(p, `<b>Group ${i + 1} of 10</b><br>Predicted ${pct(cal[i].pred, 1)}<br>Observed ${pct(cal[i].obs, 1)}`)); }
+}
+
+/* ---------- leaderboard ---------- */
+let boardMode = 'key';
+const NICE = {
+  'pygam_ns20': 'GAM, 20 splines (recommended)', 'NESTED_spline_lr_grid': 'Spline logistic regression', 'ebm_default': 'Explainable Boosting Machine',
+  'kde_nb_bw0.3': 'Naive Bayes, smoothed densities', 'gnb_quantile_normal': 'Naive Bayes, Gaussian (rank-normalised)', 'lr_linear': 'Logistic regression, linear',
+  'CatBoost tuned': 'CatBoost', 'LightGBM tuned': 'LightGBM', 'XGBoost tuned': 'XGBoost', 'GradientBoosting (sklearn) tuned': 'sklearn GradientBoosting',
+  'HistGradientBoosting (sklearn) tuned': 'sklearn HistGradientBoosting', 'NESTED_stack_catboost_spline': 'Stack: CatBoost + spline LR',
+  'torch_ple32_mlp256x128_k5_drop0.3': 'Neural net, PLE + MLP ×5', 'mlp_bag10_64x32_a1': 'Neural net, bagged MLP ×10', 'mlp_128x64_a1.0': 'Neural net, MLP 128-64',
+  'et_leaf30': 'Extra trees', 'rf_leaf50': 'Random forest', 'knn_quantile_k600': 'k-nearest neighbours (k = 600)', 'stack_cb_spline_ebm_et_kde': 'Stack: 5 model types',
+};
+const KEY = ['pygam_ns20', 'NESTED_spline_lr_grid', 'ebm_default', 'kde_nb_bw0.3', 'CatBoost tuned', 'LightGBM tuned', 'GradientBoosting (sklearn) tuned', 'XGBoost tuned', 'HistGradientBoosting (sklearn) tuned',
+  'NESTED_stack_catboost_spline', 'stack_cb_spline_ebm_et_kde', 'torch_ple32_mlp256x128_k5_drop0.3', 'mlp_bag10_64x32_a1', 'et_leaf30', 'rf_leaf50', 'knn_quantile_k600', 'gnb_quantile_normal', 'lr_linear'];
+function drawBoard() {
+  let rows = boardMode === 'key' ? KEY.map(n => D.leaderboard.find(r => r.name === n)).filter(Boolean) : D.leaderboard.filter(r => r.honest && r.auc > 0.6);
+  const fams = [...new Set(rows.map(r => r.family))].sort((a, b) => Math.max(...rows.filter(r => r.family === b).map(r => r.auc)) - Math.max(...rows.filter(r => r.family === a).map(r => r.auc)));
+  const out = []; fams.forEach(f => { out.push({ group: f }); rows.filter(r => r.family === f).sort((a, b) => b.auc - a.auc).forEach(r => {
+    const hl = r.name === 'pygam_ns20';
+    out.push({ label: NICE[r.name] || r.name, v: r.auc, lo: r.auc - r.std, hi: r.auc + r.std, hl, c: hl ? 'var(--accent)' : 'var(--muted)',
+      tip: `<b>${NICE[r.name] || r.name}</b><br>CV AUC ${f4(r.auc)} ± ${f4(r.std)}<br>PR AUC ${f4(r.pr)}<br>${r.honest ? 'Honest score' : 'Settings picked on these folds (slightly optimistic)'}<br>Run by ${r.who}` }); }); });
+  dots($('#c-board'), out, { d0: 0.68, d1: 0.715, nt: 7, ref: D.facts.ceiling, refLabel: 'ceiling ≈ ' + f3(D.facts.ceiling) });
+}
+$('#b-key').onclick = () => { boardMode = 'key'; $('#b-key').setAttribute('aria-pressed', 'true'); $('#b-honest').setAttribute('aria-pressed', 'false'); drawBoard(); };
+$('#b-honest').onclick = () => { boardMode = 'honest'; $('#b-honest').setAttribute('aria-pressed', 'true'); $('#b-key').setAttribute('aria-pressed', 'false'); drawBoard(); };
+
+/* ---------- static tables ---------- */
+const o = D.outliers;
+$('#out-cap').textContent = `${o.any_rows.toLocaleString()} rows (${pct(o.any_share, 1)}) have at least one outlier, but their "Needs Maintenance" share (${pct(o.pos_share_in_outliers, 1)}) is close to the overall ${pct(D.dataset.pos_share, 1)}, so they are skewed readings, not a separate failure mode. All rows were kept. Only ${o.coolant_over_100} rows have coolant above 100 °C (max ${D.sensors[5].max.toFixed(1)} °C), the one clearly implausible value.`;
+const Q = [['Rows', D.dataset.rows.toLocaleString()], ['Missing values', D.dataset.missing], ['Duplicate rows', D.dataset.dupes], ['Train / val / test overlap', '0 rows'],
+  ['Label leakage through row order', 'None (label autocorrelation equals chance)'], ['Hidden patterns (decimals, RPM digits)', 'None found'], ['Largest sensor correlation', '±0.08 overall, ±0.09 within a class']];
+$('#t-quality').innerHTML = Q.map(([a, b]) => `<tr><td>${a}</td><td class="r">${b}</td></tr>`).join('');
+const WHY = [['Sensors independent?', 'Yes: |correlation| ≤ 0.09'], ['Interactions help (EBM)?', `+${D.facts.interaction_ebm[0].toFixed(4)} AUC, p = ${D.facts.interaction_ebm[1]}`],
+  ['Deeper trees help (CatBoost depth 2 vs 1)?', `+${D.facts.interaction_cb[0].toFixed(4)} AUC, p = ${D.facts.interaction_cb[1]}`], ['Additive GAM vs best boosting', 'Tie (+0.0005, p = 0.58)'],
+  ['Ensembles of 2 to 5 models', '+0.0005 at most, not significant'], ['Removing likely mislabelled rows', 'Slightly worse']];
+$('#t-why').innerHTML = '<tr><th>Check</th><th class="r">Result</th></tr>' + WHY.map(([a, b]) => `<tr><td style="white-space:normal">${a}</td><td class="r">${b}</td></tr>`).join('');
+$('#t-cost').innerHTML = '<tr><th class="r">Miss cost r</th><th class="r">Best threshold</th><th class="r">Engines flagged</th><th class="r">Saving</th></tr>' +
+  D.cost.map(c => `<tr${c.saving > 0.05 ? ' class="hl"' : ''}><td class="r">${c.r}</td><td class="r">${c.t.toFixed(2)}</td><td class="r">${pct(c.flagged)}</td><td class="r">${pct(c.saving, 1)}</td></tr>`).join('');
+$('#cal-cap').textContent = `Out-of-fold predictions grouped into 10 equal bins. Points sit on the diagonal: when the model says 70%, about 70% of those engines need maintenance. Brier score ${f4(D.brier.gam_oof)} vs ${f4(D.brier.prevalence_only)} for always predicting 63%.`;
+const PLAIN = [
+  'Low RPM is the strongest warning sign. Compared with a typical engine (about 750 rpm), the odds of "Needs Maintenance" are about 5 times higher at 400 rpm and about half at 1,100 rpm or more.',
+  'Higher fuel pressure raises the risk up to roughly 8 bar, then levels off.',
+  'Cooler lub oil (below about 77 °C) goes with higher risk; above about 78 °C the effect is flat.',
+  'Higher lub oil pressure nudges the risk up. Coolant pressure and coolant temperature barely matter.',
+  'These are patterns in the data, not proven causes: the label definition is unknown.'];
+$('#plain').innerHTML = PLAIN.map(p => `<li>${p}</li>`).join('');
+const WORK = [
+  ['#4', 'PR', 'Uzair', 'Teammate setup guide, data download and setup check scripts'],
+  ['#5', 'PR', 'Cynthia', 'Engine data cleaning notebook, outlier analysis, readiness report'],
+  ['#20', 'PR', 'Uzair', 'Shared evaluation protocol (src/common.py) and results log (#8)'],
+  ['#19', 'PR', 'Rishabh', 'Boosting libraries added to requirements (#9)'],
+  ['#21', 'PR', 'Uzair', 'scikit-learn GradientBoosting and HistGradientBoosting, nested CV (#10)'],
+  ['#22', 'PR', 'Uzair', 'LightGBM, nested CV (#12)'],
+  ['#23', 'PR', 'Uzair', 'Class weights, thresholds, calibration, cost analysis (#15)'],
+  ['#24', 'PR', 'Rishabh', 'XGBoost, CatBoost, feature engineering test, interpretation (#11, #13, #14, #16)'],
+  ['#25', 'PR', 'Rishabh', 'Final model comparison, test-set evaluation and report (#18)'],
+  ['local', 'Branch', 'Uzair', 'Model improvement: 73 more configurations, GAM, neural nets, ensembles (feat/model-improvement, not pushed)'],
+  ['#6', 'Issue · open', 'Xin', 'Write the data exploration and preparation section'],
+  ['#17', 'Issue · open', 'Cynthia, Xin', 'Other model families for comparison'],
+  ['#1, #3', 'Issue · open', 'Xin, Cynthia', 'Local setup confirmation']];
+$('#t-work').innerHTML = '<tr><th>Ref</th><th>Type</th><th>Who</th><th>What</th></tr>' + WORK.map(r => `<tr><td class="mono">${r[0]}</td><td>${r[1].includes('open') ? '<span class="chip muted">' + r[1] + '</span>' : r[1] === 'Branch' ? '<span class="chip">local branch</span>' : '<span class="chip good">merged</span>'}</td><td>${r[2]}</td><td style="white-space:normal;min-width:260px">${r[3]}</td></tr>`).join('');
+
+/* ---------- gallery ---------- */
+const CAP = {
+  'boosting_catboost_overfit.png': 'CatBoost train vs validation AUC by boosting round (#13)', 'boosting_lightgbm_overfit.png': 'LightGBM train vs validation AUC by round (#12)',
+  'boosting_sklearn_overfit.png': 'sklearn boosting: validation AUC peaks after 25–60 trees (#10)', 'boosting_xgboost_overfit.png': 'XGBoost train vs validation AUC by round (#11)',
+  'calibration.png': 'Calibration of raw, sigmoid and isotonic probabilities (#15)', 'engine_boxplots.svg': 'Box plots of the six sensors with outliers (PR #5)',
+  'final_model_comparison.png': 'Final comparison of tuned boosting models (#18)', 'final_test_roc.png': 'Test-set ROC curves of the top 3 boosting models (#18)',
+  'interp_library_agreement.png': 'Importance ranking agrees across CatBoost, XGBoost, LightGBM (#16)', 'interp_partial_dependence_catboost.png': 'CatBoost partial dependence (#16)',
+  'interp_permutation_catboost.png': 'CatBoost permutation importance (#16)', 'interp_shap_dependence_catboost.png': 'SHAP dependence plots (#16)',
+  'interp_shap_summary_catboost.png': 'SHAP summary (#16)', 'threshold_tradeoff.png': 'Precision / recall vs threshold (#15)' };
+$('#gallery').innerHTML = D.figures.map((f, i) => `<figure><img src="${f.src}" alt="${CAP[f.file] || f.file}" data-i="${i}" tabindex="0"><figcaption>${CAP[f.file] || f.file}<b>${f.file}</b></figcaption></figure>`).join('');
+const dlg = $('#zoom');
+document.querySelectorAll('#gallery img').forEach(im => { const open = () => { $('#zoom-img').src = im.src; $('#zoom-img').alt = im.alt; dlg.showModal(); };
+  im.addEventListener('click', open); im.addEventListener('keydown', e => { if (e.key === 'Enter') open(); }); });
+dlg.addEventListener('click', () => dlg.close());
+
+/* ---------- all runs table ---------- */
+let sortK = 'auc', sortDir = -1, honestOnly = false;
+const COLS = [['name', 'Run'], ['family', 'Family'], ['auc', 'CV AUC', 1], ['std', '± sd', 1], ['pr', 'PR AUC', 1], ['honest', 'Score type'], ['who', 'By'], ['source', 'Source']];
+function drawAll2() {
+  const q = $('#q').value.toLowerCase();
+  const rows = D.leaderboard.filter(r => (!honestOnly || r.honest) && (r.name + ' ' + r.family + ' ' + (NICE[r.name] || '')).toLowerCase().includes(q))
+    .sort((a, b) => (a[sortK] > b[sortK] ? 1 : a[sortK] < b[sortK] ? -1 : 0) * sortDir);
+  $('#run-count').textContent = rows.length + ' of ' + D.leaderboard.length + ' runs';
+  $('#t-all').innerHTML = '<thead><tr>' + COLS.map(([k, l, n]) => `<th class="sortable${n ? ' r' : ''}" data-k="${k}" aria-sort="${k === sortK ? (sortDir > 0 ? 'ascending' : 'descending') : 'none'}">${l}${k === sortK ? (sortDir > 0 ? ' ▲' : ' ▼') : ''}</th>`).join('') + '</tr></thead><tbody>' +
+    rows.map(r => `<tr${r.name === 'pygam_ns20' ? ' class="hl"' : ''}><td class="mono" style="font-size:0.8rem">${r.name}</td><td>${r.family}</td><td class="r">${f4(r.auc)}</td><td class="r">${f4(r.std)}</td><td class="r">${f4(r.pr)}</td><td>${r.honest ? '<span class="chip">honest</span>' : '<span class="chip muted">picked on CV</span>'}</td><td>${r.who}</td><td>${r.source}</td></tr>`).join('') + '</tbody>';
+  document.querySelectorAll('#t-all th').forEach(th => th.onclick = () => { const k = th.dataset.k; sortDir = k === sortK ? -sortDir : (k === 'auc' || k === 'pr' ? -1 : 1); sortK = k; drawAll2(); });
+}
+$('#q').addEventListener('input', drawAll2);
+$('#f-all').onclick = () => { honestOnly = false; $('#f-all').setAttribute('aria-pressed', 'true'); $('#f-honest').setAttribute('aria-pressed', 'false'); drawAll2(); };
+$('#f-honest').onclick = () => { honestOnly = true; $('#f-honest').setAttribute('aria-pressed', 'true'); $('#f-all').setAttribute('aria-pressed', 'false'); drawAll2(); };
+drawAll2();
+
+drawAll();
+let rt; addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(drawAll, 150); });
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', drawAll);
+new MutationObserver(drawAll).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+</script>
