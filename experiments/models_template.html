@@ -120,6 +120,28 @@ td .d { display: block; color: var(--muted); font-size: 0.8rem; }
 .runs-box { max-height: 560px; overflow: auto; border: 1px solid var(--grid); border-radius: 8px; padding: 0 10px; }
 #runs thead th { position: sticky; top: 0; background: var(--surface); }
 
+/* risk curves (partial dependence) */
+.pd-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 210px), 1fr)); gap: 12px 18px; }
+.pd { display: grid; gap: 2px; min-width: 0; }
+.pd h4 { margin: 0; font: 600 0.8rem/1.3 var(--f-body); color: var(--ink); }
+.pd h4 small { font-weight: 400; color: var(--muted); }
+.lc svg { display: block; overflow: visible; touch-action: pan-y; }
+.obs { fill: var(--muted); opacity: 0.5; }
+.pdl { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.pdl.ref { stroke: var(--hi); }
+.pdl.dim { stroke: var(--axis); stroke-width: 1.25; }
+.basel { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 2 3; }
+.xh { stroke: var(--ink-2); stroke-width: 1; }
+.xdot { stroke: var(--surface); stroke-width: 2; }
+.sw.line { width: 18px; height: 0; border-radius: 0; border-top: 2px solid var(--accent); background: none; }
+.sw.line.ref { border-top-color: var(--hi); border-top-style: solid; }
+.sw.line.dim { border-top-color: var(--axis); }
+.sw.base { width: 18px; height: 0; border-radius: 0; border-top: 1px dashed var(--muted); background: none; }
+.sw.obs { width: 7px; height: 7px; background: var(--muted); opacity: 0.6; }
+.seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg button { font: inherit; font-size: 0.82rem; padding: 6px 11px; border-radius: 999px; border: 1px solid var(--axis); background: var(--surface); color: var(--ink-2); cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+.seg-row { display: grid; gap: 6px; }
 ul.plain { margin: 0; padding-left: 20px; display: grid; gap: 8px; max-width: 72ch; }
 footer { padding-block: 40px 56px; color: var(--muted); font-size: 0.82rem; display: grid; gap: 6px; }
 @media (max-width: 560px) { .card { padding: 14px 14px; } .tile .v { font-size: 1.6rem; } }
@@ -140,7 +162,7 @@ html { scroll-behavior: smooth; }
 </header>
 
 <nav class="toc" aria-label="Sections"><div class="wrap">
-  <a href="#overview">Overview</a><a href="#reading">Reading the scores</a><a href="#f-base">Baselines</a><a href="#f-linear">Linear</a><a href="#f-additive">Additive</a><a href="#f-nb">Naive Bayes</a><a href="#f-knn">kNN</a><a href="#f-trees">Forests</a><a href="#f-boost">Boosting</a><a href="#f-nn">Neural nets</a><a href="#f-ens">Ensembles</a><a href="#tricks">Other techniques</a><a href="#test">Test set</a><a href="#lessons">Lessons</a><a href="#runs">All runs</a>
+  <a href="#overview">Overview</a><a href="#shapes">Risk curves</a><a href="#reading">Reading the scores</a><a href="#f-base">Baselines</a><a href="#f-linear">Linear</a><a href="#f-additive">Additive</a><a href="#f-nb">Naive Bayes</a><a href="#f-knn">kNN</a><a href="#f-trees">Forests</a><a href="#f-boost">Boosting</a><a href="#f-nn">Neural nets</a><a href="#f-ens">Ensembles</a><a href="#tricks">Other techniques</a><a href="#test">Test set</a><a href="#lessons">Lessons</a><a href="#runs">All runs</a>
 </div></nav>
 
 <main class="wrap">
@@ -155,6 +177,22 @@ html { scroll-behavior: smooth; }
     <div class="legend"><span><i class="sw"></i>Score from fixed or nested-tuned settings</span><span><i class="sw open"></i>Settings picked on the same folds (slightly optimistic)</span><span><i class="sw hi"></i>Best in family</span></div>
     <div class="rc" id="ch-overview" style="--lw:170px"></div>
     <p class="note">Spread across folds is about ±0.008 for every model, so differences smaller than about 0.002 are noise.</p>
+  </div>
+</section>
+
+<section id="shapes">
+  <div class="sec-head">
+    <span class="eyebrow">What the models learned</span>
+    <h2>How each family turns a sensor reading into risk</h2>
+    <p>Each line shows a model's average predicted chance of "Needs Maintenance" as one sensor moves across its range, with the other five sensors kept at their real values. Grey dots are what actually happened: the share of engines needing maintenance in each band of readings. Pick a sensor, then pick a family to compare it with the GAM.</p>
+  </div>
+  <div class="card">
+    <div class="seg-row"><span class="lbl">Sensor</span><div class="seg" id="seg-sensor" role="group" aria-label="Sensor"></div></div>
+    <div class="seg-row"><span class="lbl">Compare with the GAM</span><div class="seg" id="seg-fam" role="group" aria-label="Model family"></div></div>
+    <div class="legend" id="cmp-legend"></div>
+    <div class="lc" id="ch-cmp"></div>
+    <p class="cap" id="cmp-cap"></p>
+    <p class="note">Curves come from one representative model per family, fitted on all 16,604 development rows (experiments/model_curves.py). The y-axis is the same for every sensor, so a flat line means the sensor barely moves the risk.</p>
   </div>
 </section>
 
@@ -251,6 +289,7 @@ html { scroll-behavior: smooth; }
 
 <script>
 const DATA = __DATA__;
+const CURVES = DATA.curves;
 const NS = "http://www.w3.org/2000/svg";
 const f3 = v => v.toFixed(3), f4 = v => v.toFixed(4);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -422,12 +461,98 @@ famHost.outerHTML = FAM.map(f => {
       <div class="fam-top"><h2>${f.title}</h2><span class="best">best <b>${f.fam === "Baseline" ? "0.500" : f3(best)}</b> · ${n} run${n === 1 ? "" : "s"}</span></div>
       <div class="grid2"><div><span class="lbl">How it works</span><p>${f.how}</p></div><div><span class="lbl">Why we tried it</span><p>${f.why}</p></div></div>
       ${f.chart === "boost" ? `<div class="sub"><h3>Default vs. tuned, and tree depth</h3><div class="legend"><span><i class="sw open"></i>Library defaults</span><span><i class="sw"></i>Tuned</span></div><div class="rc" id="ch-boost" style="--lw:200px"></div><div class="rc" id="ch-depth" style="--lw:200px"></div><p class="note">Axis starts at 0.65.</p></div>` : ""}
+      ${CURVES.curves[f.fam] || f.fam === "Baseline" ? `<div class="sub"><h3>How this model sees each sensor</h3><p class="cap">The line is this model's average predicted risk as one sensor changes, other sensors kept at their real values. Grey dots are the actual share needing maintenance in each band of readings. Hover or tap a chart for values.</p><div class="pd-grid" data-fam="${f.fam}"></div></div>` : ""}
       ${f.subs.map(s => `<div class="sub">${s.name ? `<h3>${s.name}</h3>` : ""}${s.text ? `<p class="cap">${s.text}</p>` : ""}${rowsTable(s.rows)}</div>`).join("")}
       <div class="learned"><span class="lbl">What we learned</span><p>${f.learned}</p></div>
     </div></section>`;
 }).join("");
 
 document.getElementById("tricks-body").innerHTML = TRICKS.map(t => `<tr><td><b>${esc(t[0])}</b></td><td>${esc(t[1])}</td><td>${esc(t[2])}</td></tr>`).join("");
+
+/* ---------- risk curves ---------- */
+function svgEl(t, a, parent) { const e = document.createElementNS(NS, t); for (const k in a) e.setAttribute(k, a[k]); if (parent) parent.append(e); return e; }
+function niceTicks(a, b, n) {
+  const raw = (b - a) / n, mag = 10 ** Math.floor(Math.log10(raw)), st = [1, 2, 2.5, 5, 10].map(s => s * mag).find(s => s >= raw);
+  const out = []; for (let v = Math.ceil(a / st) * st; v <= b + 1e-9; v += st) out.push(+v.toFixed(6)); return out;
+}
+const pct = v => Math.round(v * 100) + "%";
+const fmtX = (v, span) => span >= 100 ? Math.round(v).toLocaleString() : span >= 10 ? v.toFixed(1) : v.toFixed(2);
+// cfg: { x:[a,b], y:[a,b], h, grid, series:[{y, cls, name}], obs:[{x,rate,n}], base, unit, label }
+function lineChart(el, cfg) {
+  let lastW = -1;
+  function draw() {
+    const W = el.clientWidth; if (!W || W === lastW) return; lastW = W;
+    const H = cfg.h || 150, m = { l: 34, r: 10, t: 8, b: 22 };
+    const [x0, x1] = cfg.x, [y0, y1] = cfg.y, span = x1 - x0;
+    const X = v => m.l + (v - x0) / span * (W - m.l - m.r), Y = v => m.t + (1 - (Math.min(Math.max(v, y0), y1) - y0) / (y1 - y0)) * (H - m.t - m.b);
+    const svg = svgEl("svg", { width: W, height: H, viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": cfg.label });
+    for (const v of [0.2, 0.4, 0.6, 0.8, 1.0].filter(v => v >= y0 && v <= y1)) {
+      svgEl("line", { x1: m.l, x2: W - m.r, y1: Y(v), y2: Y(v), class: "gridl" }, svg);
+      svgEl("text", { x: m.l - 6, y: Y(v) + 4, "text-anchor": "end", class: "tick" }, svg).textContent = pct(v);
+    }
+    for (const v of niceTicks(x0, x1, W < 300 ? 3 : 5))
+      svgEl("text", { x: X(v), y: H - 5, "text-anchor": "middle", class: "tick" }, svg).textContent = (+v.toFixed(2)).toLocaleString();
+    if (cfg.base != null) svgEl("line", { x1: m.l, x2: W - m.r, y1: Y(cfg.base), y2: Y(cfg.base), class: "basel" }, svg);
+    for (const o of cfg.obs) if (o.x >= x0 && o.x <= x1) svgEl("circle", { cx: X(o.x), cy: Y(o.rate), r: 2.6, class: "obs" }, svg);
+    const order = [...cfg.series].sort((a, b) => (a.cls === "dim" ? 0 : 1) - (b.cls === "dim" ? 0 : 1));
+    for (const s of order) svgEl("path", { d: s.y.map((v, i) => (i ? "L" : "M") + X(cfg.grid[i]).toFixed(1) + " " + Y(v).toFixed(1)).join(""), class: "pdl " + (s.cls || "") }, svg);
+    const xh = svgEl("line", { y1: m.t, y2: H - m.b, class: "xh", visibility: "hidden" }, svg);
+    const shown = cfg.series.filter(s => s.cls !== "dim");
+    const dots = shown.map(s => svgEl("circle", { r: 4, class: "xdot", fill: s.cls === "ref" ? "var(--hi)" : "var(--accent)", visibility: "hidden" }, svg));
+    const hit = svgEl("rect", { x: m.l, y: 0, width: W - m.l - m.r, height: H, class: "hit" }, svg);
+    const move = e => {
+      const r = svg.getBoundingClientRect(), xv = x0 + (e.clientX - r.left - m.l) / (W - m.l - m.r) * span;
+      let i = 0; cfg.grid.forEach((g, j) => { if (Math.abs(g - xv) < Math.abs(cfg.grid[i] - xv)) i = j; });
+      const gx = X(cfg.grid[i]); xh.setAttribute("x1", gx); xh.setAttribute("x2", gx); xh.setAttribute("visibility", "visible");
+      shown.forEach((s, k) => { dots[k].setAttribute("cx", gx); dots[k].setAttribute("cy", Y(s.y[i])); dots[k].setAttribute("visibility", "visible"); });
+      const ob = cfg.obs.reduce((a, o) => Math.abs(o.x - cfg.grid[i]) < Math.abs(a.x - cfg.grid[i]) ? o : a);
+      tip.show(e, `${esc(cfg.label)} <b>${fmtX(cfg.grid[i], span)} ${esc(cfg.unit)}</b><br>` + shown.map(s => `${esc(s.name)}: <b>${pct(s.y[i])}</b>`).join("<br>") + `<br>Actual, nearby band: <b>${pct(ob.rate)}</b>`);
+    };
+    hit.addEventListener("pointermove", move); hit.addEventListener("pointerdown", move);
+    hit.addEventListener("pointerleave", () => { tip.hide(); xh.setAttribute("visibility", "hidden"); dots.forEach(d => d.setAttribute("visibility", "hidden")); });
+    el.innerHTML = ""; el.append(svg);
+  }
+  if (el._ro) el._ro.disconnect();
+  el._ro = new ResizeObserver(draw); el._ro.observe(el); draw();
+}
+const SENS = ["Engine RPM", "Fuel Pressure", "Lub Oil Temp", "Lub Oil Pressure", "Coolant Pressure", "Coolant Temp"];
+const YD = [0.2, 1.0];
+const famCurve = (fam, s) => fam === "Baseline" ? CURVES.grid[s].map(() => CURVES.base_rate) : CURVES.curves[fam].y[s];
+const MODEL_NAME = { "Baseline": "Baseline", "Linear": "Logistic regression", "Naive Bayes": "KDE naive Bayes", "k-nearest neighbours": "kNN, k = 600", "Tree ensembles (RF / ET)": "Extra trees", "Neural network": "MLP 128 → 64", "Gradient boosting": "CatBoost tuned", "Additive (GAM / splines)": "GAM, 20 splines" };
+document.querySelectorAll(".pd-grid").forEach(g => {
+  const fam = g.dataset.fam;
+  g.innerHTML = SENS.map((s, i) => `<div class="pd"><h4>${s} <small>${CURVES.units[s]}</small></h4><div class="lc" id="pd-${g.dataset.fam.replace(/\W+/g, "")}-${i}"></div></div>`).join("");
+  SENS.forEach((s, i) => lineChart(g.querySelector(`#pd-${fam.replace(/\W+/g, "")}-${i}`), {
+    x: [CURVES.grid[s][0], CURVES.grid[s].at(-1)], y: YD, h: 140, grid: CURVES.grid[s], obs: CURVES.observed[s], unit: CURVES.units[s], label: s,
+    series: [{ y: famCurve(fam, s), name: MODEL_NAME[fam] }] }));
+});
+// comparison chart
+const CMP = ["Linear", "Naive Bayes", "k-nearest neighbours", "Tree ensembles (RF / ET)", "Neural network", "Gradient boosting"];
+const CMP_NOTE = {
+  "Linear": "Logistic regression can only draw an S-shaped curve that keeps going the same way, so it misses where the real effect bends or flattens.",
+  "Naive Bayes": "Naive Bayes follows the GAM almost exactly on RPM, the sensor that matters most. On the weak sensors its curves wander by a few points, but those sensors barely move the risk, so it still scores close to the GAM.",
+  "k-nearest neighbours": "kNN's curves are flatter: averaging 600 neighbours blurs the effect, and treating all sensors as equally important dilutes RPM.",
+  "Tree ensembles (RF / ET)": "Tree models build curves out of steps. Averaging 500 trees smooths them, but large leaves pull the extremes toward the middle (87% at the lowest RPM vs 91% for the GAM).",
+  "Neural network": "The neural net learns smooth curves very close to the GAM's, without being told the effects are separate.",
+  "Gradient boosting": "Boosting follows the same shape as the GAM, built from small steps. That's why the two score the same."
+};
+let cmpSensor = SENS[0], cmpFam = "Linear";
+function seg(host, items, cur, on) {
+  host.innerHTML = items.map(([k, l]) => `<button type="button" data-k="${esc(k)}" aria-pressed="${k === cur}">${esc(l)}</button>`).join("");
+  host.querySelectorAll("button").forEach(b => b.addEventListener("click", () => { host.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b)); on(b.dataset.k); }));
+}
+function drawCmp() {
+  const s = cmpSensor;
+  const series = CMP.filter(f => f !== cmpFam).map(f => ({ y: famCurve(f, s), cls: "dim", name: MODEL_NAME[f] }));
+  series.push({ y: famCurve("Additive (GAM / splines)", s), cls: "ref", name: "GAM" }, { y: famCurve(cmpFam, s), name: MODEL_NAME[cmpFam] });
+  document.getElementById("cmp-legend").innerHTML = `<span><i class="sw line"></i>${esc(MODEL_NAME[cmpFam])}</span><span><i class="sw line ref"></i>GAM (recommended)</span><span><i class="sw line dim"></i>Other families</span><span><i class="sw obs"></i>Actual share, per band</span><span><i class="sw base"></i>Overall average, ${pct(CURVES.base_rate)}</span>`;
+  document.getElementById("cmp-cap").textContent = CMP_NOTE[cmpFam];
+  const el = document.getElementById("ch-cmp");
+  lineChart(el, { x: [CURVES.grid[s][0], CURVES.grid[s].at(-1)], y: YD, h: 280, grid: CURVES.grid[s], obs: CURVES.observed[s], unit: CURVES.units[s], label: s, base: CURVES.base_rate, series });
+}
+seg(document.getElementById("seg-sensor"), SENS.map(s => [s, s]), cmpSensor, k => { cmpSensor = k; drawCmp(); });
+seg(document.getElementById("seg-fam"), CMP.map(f => [f, MODEL_NAME[f]]), cmpFam, k => { cmpFam = k; drawCmp(); });
+drawCmp();
 
 /* ---------- overview chart ---------- */
 const ORDER = ["Linear", "k-nearest neighbours", "Naive Bayes", "Tree ensembles (RF / ET)", "Neural network", "Gradient boosting", "Ensemble / stack", "Additive (GAM / splines)"];

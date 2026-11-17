@@ -62,7 +62,9 @@ def desc(n):
     return n2.replace("(params from #13)", "with #13 settings")
 
 lb = [{**r, "desc": desc(r["name"])} for r in d["leaderboard"]]
-out = {"leaderboard": lb, "test": [{k: t[k] for k in ("name", "auc", "lo", "hi", "brier", "by")} for t in d["test"]]}
+curves = json.loads((HERE / "model_curves.json").read_text())
+curves["units"] = {x["name"]: x["unit"] for x in d["sensors"]}
+out = {"curves": curves, "leaderboard": lb, "test": [{k: t[k] for k in ("name", "auc", "lo", "hi", "brier", "by")} for t in d["test"]]}
 page = (HERE / "models_template.html").read_text().replace("__DATA__", json.dumps(out))
 import sys
 art = Path(sys.argv[1]) if len(sys.argv) > 1 else None
