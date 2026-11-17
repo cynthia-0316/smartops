@@ -1,0 +1,613 @@
+<title>SmartOps Model Lineup</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column (max 1040px), sticky section bar, one card per model family; every chart is drawn from the embedded run log. */
+:root {
+  --plane: #f4f6f8; --surface: #ffffff; --ink: #11161c; --ink-2: #4a525c; --muted: #6f7884;
+  --grid: #e3e7eb; --axis: #c2c9d0; --ring: rgba(17,22,28,0.10);
+  --accent: #2a78d6; --accent-soft: #e4effc; --hi: #eb6834; --ceil: #8a5a00;
+  --f-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --f-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --plane: #0e1114; --surface: #171b20; --ink: #eef1f4; --ink-2: #b9c1ca; --muted: #8f98a2;
+  --grid: #262c33; --axis: #3a424b; --ring: rgba(255,255,255,0.10);
+  --accent: #4b93ea; --accent-soft: #1b2b40; --hi: #e0652f; --ceil: #e0a838; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --plane: #0e1114; --surface: #171b20; --ink: #eef1f4; --ink-2: #b9c1ca; --muted: #8f98a2;
+  --grid: #262c33; --axis: #3a424b; --ring: rgba(255,255,255,0.10);
+  --accent: #4b93ea; --accent-soft: #1b2b40; --hi: #e0652f; --ceil: #e0a838; color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { background: var(--plane); color: var(--ink); font: 15px/1.6 var(--f-body); margin: 0; }
+.wrap { max-width: 1040px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1, h2, h3 { font-family: var(--f-display); line-height: 1.15; text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(2rem, 5vw, 3rem); font-weight: 800; letter-spacing: -0.02em; }
+h2 { font-size: clamp(1.4rem, 3vw, 1.8rem); font-weight: 700; letter-spacing: -0.01em; }
+h3 { font-size: 1.05rem; font-weight: 600; }
+p { margin: 0; max-width: 70ch; }
+.eyebrow { font: 500 0.74rem/1 var(--f-mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.num, td.n { font-variant-numeric: tabular-nums; }
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+header.hero { padding-block: 44px 26px; display: grid; gap: 16px; }
+.hero .lede { font-size: 1.1rem; color: var(--ink-2); max-width: 64ch; }
+nav.toc { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--plane); border-bottom: 1px solid var(--grid); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--plane); }
+nav.toc .wrap { display: flex; gap: 2px; overflow-x: auto; padding-block: 8px; scrollbar-width: none; }
+nav.toc a { flex: none; font: 500 0.82rem/1 var(--f-body); color: var(--ink-2); text-decoration: none; padding: 8px 10px; border-radius: 6px; }
+nav.toc a:hover, nav.toc a:focus-visible { background: var(--accent-soft); color: var(--ink); outline: none; }
+
+section { padding-block: 40px 6px; display: grid; gap: 18px; scroll-margin-top: 56px; }
+.sec-head { display: grid; gap: 8px; }
+.sec-head p { color: var(--ink-2); }
+
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+.tile { background: var(--surface); border: 1px solid var(--ring); border-radius: 10px; padding: 14px 16px; display: grid; gap: 2px; align-content: start; }
+.tile .v { font: 700 1.9rem/1.1 var(--f-display); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.tile .l { font-size: 0.84rem; color: var(--ink-2); }
+
+.card { background: var(--surface); border: 1px solid var(--ring); border-radius: 10px; padding: 18px 20px; display: grid; gap: 14px; min-width: 0; }
+.card .cap { font-size: 0.86rem; color: var(--ink-2); }
+.card .note { font-size: 0.8rem; color: var(--muted); }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 14px 22px; }
+.grid2 > div { display: grid; gap: 6px; align-content: start; min-width: 0; }
+.lbl { font: 600 0.72rem/1 var(--f-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.learned { background: var(--accent-soft); border-radius: 8px; padding: 12px 14px; display: grid; gap: 4px; }
+.learned p { color: var(--ink); }
+
+/* family header */
+.fam-top { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 16px; }
+.fam-top .best { font: 500 0.85rem/1.3 var(--f-mono); color: var(--ink-2); }
+.fam-top .best b { font-family: var(--f-display); font-size: 1.15rem; color: var(--ink); }
+.sub { display: grid; gap: 6px; border-top: 1px solid var(--grid); padding-top: 14px; }
+
+/* tables */
+.tbl { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 0.86rem; }
+th { text-align: left; font: 600 0.72rem/1.2 var(--f-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); padding: 6px 10px 6px 0; border-bottom: 1px solid var(--axis); white-space: nowrap; }
+td { padding: 7px 10px 7px 0; border-bottom: 1px solid var(--grid); vertical-align: top; }
+td.n, th.n { text-align: right; white-space: nowrap; font-family: var(--f-mono); font-size: 0.84rem; }
+tr.top td { font-weight: 600; }
+td .d { display: block; color: var(--muted); font-size: 0.8rem; }
+.tag { display: inline-block; font: 500 0.68rem/1 var(--f-mono); padding: 3px 6px; border-radius: 4px; border: 1px solid var(--axis); color: var(--ink-2); white-space: nowrap; vertical-align: 1px; }
+.tag.best { border-color: var(--hi); color: var(--hi); }
+
+/* row charts */
+.rc { display: grid; gap: 0; }
+.rc-row { display: grid; grid-template-columns: var(--lw, 200px) minmax(0, 1fr); align-items: center; gap: 12px; }
+.rc-lab { font-size: 0.84rem; line-height: 1.25; color: var(--ink); min-width: 0; }
+.rc-lab small { display: block; color: var(--muted); font-size: 0.75rem; }
+.rc-track { min-width: 0; }
+.rc-track svg { display: block; }
+.rc.narrow .rc-row { grid-template-columns: minmax(0, 1fr); gap: 0; }
+.rc.narrow .rc-row:not(.rc-axis) .rc-lab { padding-top: 6px; }
+.rc.narrow .rc-axis .rc-lab { display: none; }
+.gridl { stroke: var(--grid); stroke-width: 1; }
+.refl { stroke: var(--ceil); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.tick { fill: var(--muted); font: 11px var(--f-mono); }
+.mk { fill: var(--accent); stroke: var(--surface); stroke-width: 2; }
+.mk.open { fill: var(--surface); stroke: var(--accent); stroke-width: 2; }
+.mk.hi { fill: var(--hi); }
+.mk.base { fill: var(--muted); }
+.conn { stroke: var(--axis); stroke-width: 2; }
+.ci { stroke: var(--accent); stroke-width: 2; stroke-linecap: round; opacity: 0.55; }
+.hit { fill: transparent; cursor: pointer; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 0.8rem; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 11px; height: 11px; border-radius: 50%; display: inline-block; background: var(--accent); }
+.sw.open { background: var(--surface); border: 2px solid var(--accent); }
+.sw.hi { background: var(--hi); }
+.sw.ref { width: 18px; height: 0; border-radius: 0; border-top: 2px dashed var(--ceil); background: none; }
+.sw.ci { width: 18px; height: 3px; border-radius: 2px; opacity: 0.55; }
+
+#tip { position: fixed; z-index: 20; pointer-events: none; background: var(--ink); color: var(--plane); font-size: 0.8rem; line-height: 1.35; padding: 7px 10px; border-radius: 6px; max-width: 260px; box-shadow: 0 4px 14px rgba(0,0,0,0.18); }
+#tip b { font-family: var(--f-mono); }
+
+/* all runs */
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.controls select, .controls input { font: inherit; font-size: 0.86rem; padding: 6px 9px; border: 1px solid var(--axis); border-radius: 6px; background: var(--surface); color: var(--ink); min-width: 0; }
+.controls input { flex: 1 1 180px; }
+.controls .count { font-size: 0.8rem; color: var(--muted); }
+#runs th { cursor: pointer; user-select: none; }
+#runs th[aria-sort="ascending"]::after { content: " ↑"; }
+#runs th[aria-sort="descending"]::after { content: " ↓"; }
+.runs-box { max-height: 560px; overflow: auto; border: 1px solid var(--grid); border-radius: 8px; padding: 0 10px; }
+#runs thead th { position: sticky; top: 0; background: var(--surface); }
+
+/* risk curves (partial dependence) */
+.pd-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 210px), 1fr)); gap: 12px 18px; }
+.pd { display: grid; gap: 2px; min-width: 0; }
+.pd h4 { margin: 0; font: 600 0.8rem/1.3 var(--f-body); color: var(--ink); }
+.pd h4 small { font-weight: 400; color: var(--muted); }
+.lc svg { display: block; overflow: visible; touch-action: pan-y; }
+.obs { fill: var(--muted); opacity: 0.5; }
+.pdl { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.pdl.ref { stroke: var(--hi); }
+.pdl.dim { stroke: var(--axis); stroke-width: 1.25; }
+.basel { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 2 3; }
+.xh { stroke: var(--ink-2); stroke-width: 1; }
+.xdot { stroke: var(--surface); stroke-width: 2; }
+.sw.line { width: 18px; height: 0; border-radius: 0; border-top: 2px solid var(--accent); background: none; }
+.sw.line.ref { border-top-color: var(--hi); border-top-style: solid; }
+.sw.line.dim { border-top-color: var(--axis); }
+.sw.base { width: 18px; height: 0; border-radius: 0; border-top: 1px dashed var(--muted); background: none; }
+.sw.obs { width: 7px; height: 7px; background: var(--muted); opacity: 0.6; }
+.seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg button { font: inherit; font-size: 0.82rem; padding: 6px 11px; border-radius: 999px; border: 1px solid var(--axis); background: var(--surface); color: var(--ink-2); cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+.seg-row { display: grid; gap: 6px; }
+ul.plain { margin: 0; padding-left: 20px; display: grid; gap: 8px; max-width: 72ch; }
+footer { padding-block: 40px 56px; color: var(--muted); font-size: 0.82rem; display: grid; gap: 6px; }
+@media (max-width: 560px) { .card { padding: 14px 14px; } .tile .v { font-size: 1.6rem; } }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+html { scroll-behavior: smooth; }
+</style>
+
+<header class="wrap hero">
+  <div class="eyebrow">SmartOps · CIS 508 · Engine condition prediction</div>
+  <h1>Every model we tried, and what each one taught us</h1>
+  <p class="lede">We ran 99 model configurations from 9 families to predict whether an engine needs maintenance from six sensor readings. Each family below explains how the model works, the variations we tried, and the score each variation got. The short version: once a model can bend its curves, they all land in the same place, about 0.70 AUC.</p>
+  <div class="tiles">
+    <div class="tile"><span class="v">99</span><span class="l">configurations scored</span></div>
+    <div class="tile"><span class="v">9</span><span class="l">model families</span></div>
+    <div class="tile"><span class="v">0.704</span><span class="l">best cross-validated AUC</span></div>
+    <div class="tile"><span class="v">0.71</span><span class="l">test AUC of the final models</span></div>
+  </div>
+</header>
+
+<nav class="toc" aria-label="Sections"><div class="wrap">
+  <a href="#overview">Overview</a><a href="#shapes">Risk curves</a><a href="#reading">Reading the scores</a><a href="#f-base">Baselines</a><a href="#f-linear">Linear</a><a href="#f-additive">Additive</a><a href="#f-nb">Naive Bayes</a><a href="#f-knn">kNN</a><a href="#f-trees">Forests</a><a href="#f-boost">Boosting</a><a href="#f-nn">Neural nets</a><a href="#f-ens">Ensembles</a><a href="#tricks">Other techniques</a><a href="#test">Test set</a><a href="#lessons">Lessons</a><a href="#runs">All runs</a>
+</div></nav>
+
+<main class="wrap">
+
+<section id="overview">
+  <div class="sec-head">
+    <span class="eyebrow">Overview</span>
+    <h2>Nine families, one plateau</h2>
+    <p>Each dot is one configuration, scored by cross-validated ROC AUC. Hover or tap a dot for its details. The axis starts at 0.66 so the differences are visible. The two baselines score 0.50 and sit off the left edge.</p>
+  </div>
+  <div class="card">
+    <div class="legend"><span><i class="sw"></i>Score from fixed or nested-tuned settings</span><span><i class="sw open"></i>Settings picked on the same folds (slightly optimistic)</span><span><i class="sw hi"></i>Best in family</span></div>
+    <div class="rc" id="ch-overview" style="--lw:170px"></div>
+    <p class="note">Spread across folds is about ±0.008 for every model, so differences smaller than about 0.002 are noise.</p>
+  </div>
+</section>
+
+<section id="shapes">
+  <div class="sec-head">
+    <span class="eyebrow">What the models learned</span>
+    <h2>How each family turns a sensor reading into risk</h2>
+    <p>Each line shows a model's average predicted chance of "Needs Maintenance" as one sensor moves across its range, with the other five sensors kept at their real values. Grey dots are what actually happened: the share of engines needing maintenance in each band of readings. Pick a sensor, then pick a family to compare it with the GAM.</p>
+  </div>
+  <div class="card">
+    <div class="seg-row"><span class="lbl">Sensor</span><div class="seg" id="seg-sensor" role="group" aria-label="Sensor"></div></div>
+    <div class="seg-row"><span class="lbl">Compare with the GAM</span><div class="seg" id="seg-fam" role="group" aria-label="Model family"></div></div>
+    <div class="legend" id="cmp-legend"></div>
+    <div class="lc" id="ch-cmp"></div>
+    <p class="cap" id="cmp-cap"></p>
+    <p class="note">Curves come from one representative model per family, fitted on all 16,604 development rows (experiments/model_curves.py). The y-axis is the same for every sensor, so a flat line means the sensor barely moves the risk.</p>
+  </div>
+</section>
+
+<section id="reading">
+  <div class="sec-head">
+    <span class="eyebrow">Before the details</span>
+    <h2>How to read the scores</h2>
+  </div>
+  <div class="card">
+    <div class="grid2">
+      <div><span class="lbl">ROC AUC</span><p>Pick one engine that needs maintenance and one that doesn't. AUC is the chance the model gives the first one the higher risk score. 0.50 is a coin flip and 1.00 is perfect. Our models sit around 0.70: they rank the right engine higher about 70% of the time.</p></div>
+      <div><span class="lbl">Cross-validation</span><p>Every score comes from the 16,604 training and validation rows, split 5 ways and repeated 3 times (15 fits). Each fit is scored on rows it never saw, and the 15 scores are averaged. The 2,931-row test set was kept aside and used only for the final models.</p></div>
+      <div><span class="lbl">Fair comparisons</span><p>When we tune settings and score on the same folds, the score is slightly flattering. Nested cross-validation tunes inside each training fold instead, so the score is fair. Hollow dots mark the flattering kind. The bias is about 0.001.</p></div>
+      <div><span class="lbl">Is a difference real?</span><p>We compared models fold by fold with a corrected t-test. Almost every gap between the good models was too small to be more than chance.</p></div>
+    </div>
+  </div>
+</section>
+
+<div id="families"></div>
+
+<section id="tricks">
+  <div class="sec-head">
+    <span class="eyebrow">Applied on top of the models</span>
+    <h2>Other techniques we tested</h2>
+    <p>These are changes to how a model is trained or used, not new model types. None of them improved ranking quality.</p>
+  </div>
+  <div class="card"><div class="tbl"><table>
+    <thead><tr><th>Technique</th><th>What it does</th><th>Result</th></tr></thead>
+    <tbody id="tricks-body"></tbody>
+  </table></div></div>
+</section>
+
+<section id="test">
+  <div class="sec-head">
+    <span class="eyebrow">Final check</span>
+    <h2>Test-set results</h2>
+    <p>Six finalists were scored once on the 2,931 held-out engines. The lines show 95% bootstrap confidence intervals. All six are within 0.006 of each other and their intervals overlap almost completely, so on the test set they are tied.</p>
+  </div>
+  <div class="card">
+    <div class="legend"><span><i class="sw"></i>Test AUC</span><span><i class="sw ci"></i>95% confidence interval</span><span><i class="sw hi"></i>Recommended model</span></div>
+    <div class="rc" id="ch-test" style="--lw:220px"></div>
+    <div class="tbl"><table>
+      <thead><tr><th>Model</th><th>Run by</th><th class="n">Test AUC</th><th class="n">95% CI</th><th class="n">Brier</th></tr></thead>
+      <tbody id="test-body"></tbody>
+    </table></div>
+    <p class="note">Brier score measures probability accuracy (lower is better). Predicting the base rate for every engine gives about 0.233.</p>
+  </div>
+</section>
+
+<section id="lessons">
+  <div class="sec-head">
+    <span class="eyebrow">What the variations told us</span>
+    <h2>Lessons</h2>
+  </div>
+  <div class="card">
+    <ul class="plain">
+      <li><b>Bending curves is what matters.</b> Moving from straight-line logistic regression (0.688) to any model with curved effects (about 0.703) is the only big jump in the whole project.</li>
+      <li><b>Sensor interactions add nothing.</b> Models that can combine sensors (boosting, forests, neural nets) tie models that can't (GAM, naive Bayes). Explicit interaction terms gained +0.0003 to +0.0008, and none was significant. The sensors are close to independent: no pair correlates above 0.09.</li>
+      <li><b>Tuning matters for boosting, not for additive models.</b> XGBoost went from 0.662 to 0.702 with tuning. Spline and GAM settings move the score by only 0.002.</li>
+      <li><b>Simpler settings win.</b> Every boosting library chose tiny trees, and deeper CatBoost trees did steadily worse. Engineered features and feature selection made things slightly worse.</li>
+      <li><b>Combining models doesn't help.</b> They all learn the same additive pattern and make the same mistakes, so averaging gains at most +0.0005.</li>
+      <li><b>The limit looks like the data, not the algorithm.</b> Nine very different families converge on 0.703 to 0.705, and models that can learn sensor combinations do no better than ones that can't. Bigger gains would most likely need new information: more sensors, readings over time, or cleaner labels.</li>
+      <li><b>Recommended model:</b> the GAM with 20 splines (CV 0.7041, test 0.7095). It is as accurate as anything else, fast, and you can plot exactly how each sensor moves the risk.</li>
+    </ul>
+  </div>
+</section>
+
+<section id="runs">
+  <div class="sec-head">
+    <span class="eyebrow">Reference</span>
+    <h2>All 99 runs</h2>
+    <p>Every configuration in one table. Click a column header to sort.</p>
+  </div>
+  <div class="card">
+    <div class="controls">
+      <label for="f-fam" class="lbl" style="flex:none">Family</label>
+      <select id="f-fam"><option value="">All families</option></select>
+      <input id="f-q" type="search" placeholder="Search runs" aria-label="Search runs">
+      <span class="count" id="f-count"></span>
+    </div>
+    <div class="runs-box"><table id="runs">
+      <thead><tr><th data-k="desc">Configuration</th><th data-k="family">Family</th><th data-k="who">By</th><th class="n" data-k="auc" aria-sort="descending">CV AUC</th><th class="n" data-k="std">± sd</th><th class="n" data-k="pr">PR AUC</th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+  </div>
+</section>
+
+</main>
+<footer class="wrap">
+  <span>SmartOps team · CIS 508 Machine Learning in Business · Arizona State University</span>
+  <span>Sources: the shared team results log (Uzair and Rishabh) and the model-improvement experiments in <code>experiments/</code> (log.csv, RESULTS.md).</span>
+</footer>
+<div id="tip" hidden></div>
+
+<script>
+const DATA = __DATA__;
+const CURVES = DATA.curves;
+const NS = "http://www.w3.org/2000/svg";
+const f3 = v => v.toFixed(3), f4 = v => v.toFixed(4);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+/* ---------- tooltip ---------- */
+const tipEl = document.getElementById("tip");
+const tip = {
+  show(e, html) { tipEl.innerHTML = html; tipEl.hidden = false;
+    const r = tipEl.getBoundingClientRect(); let x = e.clientX + 14, y = e.clientY + 14;
+    if (x + r.width > innerWidth - 8) x = e.clientX - r.width - 14;
+    if (y + r.height > innerHeight - 8) y = e.clientY - r.height - 14;
+    tipEl.style.left = Math.max(8, x) + "px"; tipEl.style.top = Math.max(8, y) + "px"; },
+  hide() { tipEl.hidden = true; }
+};
+addEventListener("scroll", () => tip.hide(), { passive: true });
+
+/* ---------- row chart: one HTML row per item, an SVG track per row ---------- */
+function rowChart(el, cfg) {
+  let lastW = -1;
+  const mk = (t, a) => { const e = document.createElementNS(NS, t); for (const k in a) e.setAttribute(k, a[k]); return e; };
+  function draw() {
+    const W0 = el.clientWidth; if (W0 === lastW) return; lastW = W0;
+    el.innerHTML = ""; el.classList.toggle("narrow", W0 < 560);
+    const [a, b] = cfg.domain, rows = [...cfg.rows, { axis: true }];
+    const els = rows.map(r => {
+      const row = document.createElement("div"); row.className = "rc-row" + (r.axis ? " rc-axis" : "");
+      const lab = document.createElement("div"); lab.className = "rc-lab";
+      if (!r.axis) lab.innerHTML = `<span>${r.label}</span>` + (r.sub ? `<small>${r.sub}</small>` : "");
+      const tr = document.createElement("div"); tr.className = "rc-track";
+      row.append(lab, tr); el.append(row); return tr;
+    });
+    els.forEach((tr, i) => {
+      const r = rows[i], W = Math.max(120, tr.clientWidth), H = r.axis ? 22 : (r.h || cfg.h || 30), pad = 12;
+      const x = v => pad + (Math.min(Math.max(v, a), b) - a) / (b - a) * (W - 2 * pad);
+      const svg = mk("svg", { width: W, height: H, viewBox: `0 0 ${W} ${H}`, role: r.axis ? "presentation" : "img", "aria-label": r.axis ? "" : (r.aria || r.label) });
+      cfg.ticks.forEach(t => {
+        if (r.axis) { const tx = mk("text", { x: x(t), y: 14, "text-anchor": "middle", class: "tick" }); tx.textContent = cfg.fmt ? cfg.fmt(t) : t; svg.append(tx); }
+        else svg.append(mk("line", { x1: x(t), x2: x(t), y1: 0, y2: H, class: "gridl" }));
+      });
+      if (!r.axis) {
+        (cfg.refs || []).forEach(v => svg.append(mk("line", { x1: x(v), x2: x(v), y1: 0, y2: H, class: "refl" })));
+        const cy = H / 2;
+        if (r.line) svg.append(mk("line", { x1: x(r.line[0]), x2: x(r.line[1]), y1: cy, y2: cy, class: "conn" }));
+        r.marks.forEach((m, j) => {
+          const y = cy + (m.dy || 0);
+          if (m.lo != null) svg.append(mk("line", { x1: x(m.lo), x2: x(m.hi), y1: y, y2: y, class: "ci" }));
+          svg.append(mk("circle", { cx: x(m.v), cy: y, r: m.r || 5, class: "mk " + (m.cls || "") }));
+        });
+        r.marks.forEach(m => {
+          const hit = mk("circle", { cx: x(m.v), cy: cy + (m.dy || 0), r: 10, class: "hit" });
+          hit.addEventListener("pointerenter", e => tip.show(e, m.tip));
+          hit.addEventListener("pointermove", e => tip.show(e, m.tip));
+          hit.addEventListener("pointerleave", () => tip.hide());
+          hit.addEventListener("click", e => { e.stopPropagation(); tip.show(e, m.tip); });
+          svg.append(hit);
+        });
+      }
+      tr.append(svg);
+    });
+  }
+  draw();
+  new ResizeObserver(() => draw()).observe(el);
+}
+document.addEventListener("click", () => tip.hide());
+
+/* ---------- family content ---------- */
+const H = n => `<span class="tag best">best</span>`;
+const FAM = [
+ { id: "f-base", fam: "Baseline", title: "Baselines", eyebrow: "Family 1 · The no-skill reference",
+   how: "These ignore the sensors entirely. One predicts the overall share of engines needing maintenance (63%) for every engine. The other always answers \"needs maintenance\".",
+   why: "They set the floor. Any real model has to beat a score of 0.50 to be doing anything at all.",
+   subs: [{ rows: [["Dummy, class prior", "Same 63% risk for every engine", 0.5], ["Dummy, always \"needs maintenance\"", "Flags every engine", 0.5]] }],
+   learned: "Always saying \"needs maintenance\" already gets 63% accuracy and an F1 of 0.77 with zero skill. That's why we rank models by AUC instead of accuracy or F1." },
+ { id: "f-linear", fam: "Linear", title: "Logistic regression", eyebrow: "Family 2 · Straight lines",
+   how: "Each sensor gets one weight. The model multiplies each reading by its weight, adds them up, and squashes the total into a probability between 0 and 1. Every sensor's effect is a straight line: \"each extra 100 rpm lowers the risk by a fixed amount\".",
+   why: "It is the standard simple model and the bar any more complex model must clear.",
+   subs: [{ rows: [["Logistic regression", "Sensors standardised, default settings", 0.6876]] }],
+   learned: "The weakest real model, about 0.015 below everything else. Risk doesn't change in a straight line with the readings (the RPM effect, for example, flattens out at higher speeds), and a straight line can't follow that bend." },
+ { id: "f-additive", fam: "Additive (GAM / splines)", title: "Additive models: spline LR, GAM, EBM", eyebrow: "Family 3 · Curves added together",
+   how: "These keep logistic regression's idea of one effect per sensor, added together, but let each effect be a smooth curve instead of a straight line. The three versions differ in how they build the curves.",
+   why: "Our data checks showed the sensors are close to independent. A model that learns one curve per sensor fits that structure exactly, and you can plot each curve.",
+   subs: [
+    { name: "Spline logistic regression", text: "Cuts each sensor's range at a few points (knots) and fits a smooth piece of polynomial between them, joined smoothly. Those pieces feed a normal logistic regression. C controls how freely the curves can wiggle (smaller C means smoother). We tuned the knots and C, then tried several structural changes.",
+      rows: [["4 knots × 3 values of C", "C = 0.03, 0.3 and 3", 0.7025, "0.7024 to 0.7025"], ["6 knots, C = 0.03", "The setting we carried forward", 0.7032], ["6 knots, C = 0.3 / 3", "", 0.7029, "0.7029 / 0.7029"], ["8 knots × 3 values of C", "", 0.7032, "0.7028 to 0.7032"], ["12 knots × 3 values of C", "More knots start fitting noise", 0.7023, "0.7019 to 0.7023"], ["Quadratic pieces (degree 2)", "Instead of cubic", 0.7041], ["Straight pieces (degree 1)", "Piecewise linear", 0.7029], ["More knots for RPM only", "RPM 8, 10 or 15 knots, others 6", 0.7034, "0.7032 to 0.7034"], ["Per-sensor knot counts", "RPM 10 / fuel 8 / others 5", 0.7030], ["Rank-transform sensors first", "Evenly spaced knots on the ranks", 0.7034], ["Clip extreme readings", "Capped at the 0.5th and 99.5th percentiles", 0.7031], ["Add RPM × fuel pressure surface", "One explicit interaction", 0.7028], ["Add RPM × lube oil temp surface", "One explicit interaction", 0.7036], ["Add RPM as a category", "Target-encoded RPM value", 0.7030], ["Nested: knots and C tuned inside each fold", "Fair score for the tuned model", 0.7026, null, true]] },
+    { name: "GAM (pygam)", text: "The same idea as spline LR, but the model chooses how smooth each curve should be by itself while fitting, by penalising wiggliness and picking the penalty statistically. No outer tuning loop is needed, so its cross-validated score is already fair.",
+      rows: [["8 splines per sensor", "", 0.7037, null, true], ["12 splines per sensor", "", 0.7040, null, true], ["20 splines per sensor", "Recommended final model", 0.7041, null, true, "rec"], ["30 splines per sensor", "", 0.7044, null, true], ["12 quadratic splines", "", 0.7044, null, true], ["RPM forced to only lower risk", "Monotone constraint", 0.7039, null, true], ["Add RPM × lube oil temp surface", "Tensor interaction term", 0.7039, null, true]] },
+    { name: "Explainable Boosting Machine (EBM)", text: "Builds each sensor's curve from thousands of tiny trees, cycling through the sensors one at a time so the effects stay separate. It can then add a few two-sensor interaction terms if they help.",
+      rows: [["EBM without interactions", "Purely additive", 0.7025, null, true], ["EBM with automatic interactions", "Up to 15 sensor pairs", 0.7028, null, true]] }
+   ],
+   learned: "The whole jump from 0.688 to 0.703 comes from letting each sensor's effect curve. After that, settings barely matter: 0.702 to 0.704 across 40 variations. Interaction terms gained nothing (EBM +0.0003, p = 0.18). We picked the GAM because it is as accurate as anything else and chooses its own smoothness, so its score needed no extra tuning." },
+ { id: "f-nb", fam: "Naive Bayes", title: "Naive Bayes", eyebrow: "Family 4 · Working backwards from each class",
+   how: "Instead of predicting the label from the readings, it learns what readings look like in Normal engines and in engines that need maintenance. For a new engine, it checks which group the readings fit better. It is \"naive\" because it assumes the sensors are independent within each group, which here is almost true.",
+   why: "If the sensors really are independent, naive Bayes should match the best models. That makes it a test of our independence finding.",
+   subs: [{ rows: [["Gaussian naive Bayes", "Assumes a bell curve per sensor", 0.6715, null, true], ["Gaussian NB on rank-transformed sensors", "Reshapes each sensor into a bell curve first", 0.7009], ["KDE naive Bayes (custom)", "Estimates each sensor's real distribution with smooth bumps", 0.7021], ["KDE naive Bayes, smoother bumps", "Bandwidth 0.3", 0.7025]] }],
+   learned: "The bell-curve assumption was the problem: the real distributions are skewed. With each sensor's actual shape, naive Bayes ties the boosting models, which confirms the sensors carry independent information." },
+ { id: "f-knn", fam: "k-nearest neighbours", title: "k-nearest neighbours", eyebrow: "Family 5 · Ask similar engines",
+   how: "To score an engine, it finds the k most similar engines in the training data (closest sensor readings) and reports how many of them needed maintenance, weighting closer ones more. Sensors were rank-transformed first so RPM, in the hundreds, didn't drown out pressures in single digits.",
+   why: "It makes no assumptions about the shape of the relationship at all, so it's a good check for patterns the other models miss.",
+   subs: [{ rows: [["k = 100 neighbours", "", 0.6941], ["k = 300 neighbours", "", 0.6970], ["k = 600 neighbours", "", 0.6974]] }],
+   learned: "It needed very large neighbourhoods because the signal is weak; small ones are mostly noise. It also treats all six sensors as equally important, even though RPM matters far more, which costs it about 0.006." },
+ { id: "f-trees", fam: "Tree ensembles (RF / ET)", title: "Random forest and extra trees", eyebrow: "Family 6 · Many trees voting",
+   how: "A decision tree asks yes/no questions (\"RPM below 650?\", then \"fuel pressure above 7?\") and ends in a leaf with a probability. A random forest grows 500 trees, each on a random resample of the data using random subsets of sensors, and averages their votes. Extra trees picks split points at random instead of searching for the best one, which makes it smoother.",
+   why: "Forests are a strong, low-maintenance default for tabular data and can capture interactions automatically.",
+   subs: [{ rows: [["Random forest, 500 trees", "At least 50 engines per leaf, half the sensors per split", 0.6988], ["Extra trees, 500 trees", "At least 30 engines per leaf", 0.7010]] }],
+   learned: "Both needed large leaves to stop memorising noise. They end a little below the additive models, because their step-shaped predictions approximate smooth curves less well." },
+ { id: "f-boost", fam: "Gradient boosting", title: "Gradient boosting", eyebrow: "Family 7 · Trees that fix each other's mistakes",
+   how: "Boosting builds small trees one after another. Each new tree is trained on the errors the model still makes, and a learning rate shrinks each tree's contribution so the model improves in many small steps. Its main strength is finding interactions between sensors. We tested five libraries that share the idea but differ in engineering.",
+   why: "Boosting usually wins on tabular data, so it was the team's starting point (issues #10 to #14).",
+   chart: "boost",
+   subs: [
+    { name: "Default vs. tuned settings", text: "Each library was first run with its default settings, then tuned with a randomised search. Uzair ran scikit-learn and LightGBM; Rishabh ran XGBoost and CatBoost.",
+      rows: [["scikit-learn GradientBoosting", "Classic version: default 0.7007", 0.7020, null, true], ["scikit-learn HistGradientBoosting", "Bins each sensor into 255 buckets, much faster: default 0.6957", 0.7003, null, true], ["XGBoost", "Penalties on leaf values: default 0.6620", 0.7018, null, true], ["LightGBM", "Grows trees leaf by leaf, very fast: default 0.6896", 0.7025, null, true], ["CatBoost", "Symmetric trees, built-in overfitting protection: default 0.6915", 0.7030, null, true]] },
+    { name: "Structure variations", text: "Changes to the shape of the trees, run with CatBoost and LightGBM.",
+      rows: [["CatBoost, depth 1 (stumps)", "1,000 trees, learning rate 0.03", 0.7023], ["CatBoost, depth 2", "", 0.7031], ["CatBoost, depth 3", "", 0.7014], ["CatBoost, depth 4", "", 0.6992], ["LightGBM stumps", "1,500 single-split trees, purely additive", 0.7026], ["LightGBM with monotone constraints", "Risk only falls with RPM and lube oil temp, only rises with fuel pressure", 0.7023], ["LightGBM with linear models in leaves", "", 0.7021], ["LightGBM, cross-entropy objective", "", 0.7024], ["CatBoost tuned, 5 random seeds averaged", "", 0.7037], ["CatBoost, 15-setting search nested inside each fold", "Fair score for a tuned CatBoost", 0.7019, null, true]] },
+    { name: "Feature sets (Rishabh, #14)", text: "The 6 raw sensors against the 16 extra engineered columns that ship with the dataset, 4 features of the team's own, and trimmed sets (features selected inside each fold).",
+      rows: [["CatBoost, 6 raw sensors", "", 0.7036], ["CatBoost, raw + 16 dataset features", "", 0.7028], ["CatBoost, raw + 4 of our own features", "", 0.7025], ["CatBoost, near-duplicate features dropped", "", 0.7022], ["CatBoost, top 12 features", "", 0.7001], ["CatBoost, top 8 features", "", 0.6949], ["HistGB, 6 raw sensors", "", 0.6957, null, true], ["HistGB, raw + 16 dataset features", "", 0.6945, null, true]] },
+    { name: "Class weights (Uzair, #15)", text: "Making the minority Normal class count more during training.",
+      rows: [["HistGB tuned, no class weights", "", 0.7004], ["HistGB tuned, balanced class weights", "", 0.7001]] }
+   ],
+   learned: "Tuning matters a lot for boosting: XGBoost gained 0.040. But every tuned library chose very shallow trees, CatBoost got steadily worse past depth 2, and depth 2 beat stumps by only 0.0008 (p = 0.46). Boosting's main strength, interactions, has nothing to work with here. Engineered features and trimming features both hurt slightly." },
+ { id: "f-nn", fam: "Neural network", title: "Neural networks", eyebrow: "Family 8 · Layers of simple units",
+   how: "A neural net passes the readings through layers of units. Each unit computes a weighted sum and bends it, and stacking layers lets the net represent complex curved shapes. We used weight penalties (alpha), early stopping and dropout to keep them from overfitting.",
+   why: "To make sure no flexible, deep-learning-style model could find structure the simpler models missed.",
+   subs: [
+    { name: "scikit-learn MLPs", text: "Sensors rank-transformed first. Alpha is the weight penalty; larger means simpler.",
+      rows: [["32 units, alpha 0.1 / 1.0", "", 0.6997, "0.6997 / 0.6985"], ["64 → 32 units", "", 0.6994], ["128 → 64 units, alpha 0.1 / 1.0", "", 0.7007, "0.6990 / 0.7007"], ["256 → 128 → 64 units, alpha 0.1 / 1.0", "", 0.7001, "0.6982 / 0.7001"], ["10 bagged 64 → 32 nets", "Each trained on a resample, then averaged", 0.7011]] },
+    { name: "PyTorch nets with piecewise-linear encoding", text: "A modern tabular technique: each sensor is first turned into \"how far into this range bin\" features, which makes curves easy to learn. Each configuration is a 5-net ensemble with early stopping.",
+      rows: [["Rank-transformed inputs, 128 → 64", "Without the encoding, for comparison", 0.7013], ["16-bin encoding, no hidden layer", "Effectively an additive model", 0.7029], ["16-bin encoding, 128 → 64", "", 0.7026], ["32-bin encoding, 256 → 128, dropout 0.3", "", 0.7032]] }
+   ],
+   learned: "Bigger nets didn't help. The best net (0.7032) matches the spline model, and the version with no hidden layer, which can't model interactions, is just as good. With 16,000 rows and an additive signal, a net has nothing extra to find." },
+ { id: "f-ens", fam: "Ensemble / stack", title: "Ensembles and stacking", eyebrow: "Family 9 · Combining models",
+   how: "Averaging takes the mean of several models' probabilities. Stacking trains a small logistic regression that learns how much to trust each model, using predictions each model made on data it didn't see.",
+   why: "Different model types make slightly different mistakes, and combining them can cancel some out.",
+   subs: [{ rows: [["Stack: CatBoost + spline LR", "", 0.7040], ["Stack: CatBoost + spline + EBM + extra trees + KDE NB", "Five different families", 0.7041], ["Stack, both models tuned inside each fold", "Fair score", 0.7029, null, true], ["Average of GAM + CatBoost + neural net", "Not in the run log; from RESULTS.md", 0.7046, "0.7045 to 0.7046"]] }],
+   learned: "At best +0.0005 over the GAM alone, which isn't significant. All the models learned the same additive pattern and make the same mistakes, so there's nothing for a combination to cancel out." }
+];
+
+const TRICKS = [
+ ["Nested cross-validation", "Tunes settings inside each training fold so the reported score was never used to pick them", "Fair scores came out about 0.001 lower than scores tuned on the same folds. We used them for every final comparison."],
+ ["Class weights", "Makes the minority Normal class count more during training", "AUC unchanged (0.7004 vs 0.7001). It only shifts the precision/recall balance."],
+ ["Probability calibration", "Platt scaling and isotonic regression adjust probabilities so \"70%\" means 70%", "Not needed: the models were already well calibrated (Brier 0.206 vs 0.233 for the base rate)."],
+ ["Threshold and cost analysis", "Picks the risk cutoff for flagging an engine from the cost of misses vs. inspections", "Saves 11% when a miss costs the same as an inspection. When misses cost 2× or more, inspecting almost everything is cheapest."],
+ ["Clipping outliers", "Caps extreme sensor readings", "No change (0.7031 vs 0.7032)."],
+ ["Label-noise filtering", "Drops the 15% or 30% of training rows the model finds most surprising", "Worse (0.7024 and 0.7019)."],
+ ["Feature engineering", "Rishabh (#14): the dataset's 16 extra engineered columns, 4 features of our own, and feature selection", "Slightly worse. Curves and trees can already form these shapes."],
+ ["Hidden-pattern checks", "Decimal precision, last digit of RPM, RPM as a category, row order", "No extra information anywhere. No leakage."],
+ ["Seed averaging", "Averages 5 copies of CatBoost with different random seeds", "+0.0001, negligible."],
+ ["TabPFN", "A pretrained transformer for small tables", "Not run: it needs a Prior Labs account and licence."]
+];
+
+/* ---------- render families ---------- */
+const LB = DATA.leaderboard;
+function famBest(f) { return Math.max(...LB.filter(r => r.family === f).map(r => r.auc)); }
+function rowsTable(rows) {
+  const best = Math.max(...rows.map(r => r[2]));
+  return `<div class="tbl"><table><thead><tr><th>Variation</th><th class="n">CV AUC</th></tr></thead><tbody>` +
+    rows.map(r => {
+      const tags = (r[5] === "rec" ? ` <span class="tag best">recommended</span>` : "") + (r[2] === best && rows.length > 1 && r[5] !== "rec" ? ` <span class="tag">best here</span>` : "");
+      return `<tr class="${r[2] === best && rows.length > 1 ? "top" : ""}"><td>${esc(r[0])}${tags}${r[1] ? `<span class="d">${esc(r[1])}</span>` : ""}</td><td class="n">${r[3] ? esc(r[3]) : f4(r[2])}</td></tr>`;
+    }).join("") + `</tbody></table></div>`;
+}
+const famHost = document.getElementById("families");
+famHost.outerHTML = FAM.map(f => {
+  const best = famBest(f.fam);
+  const n = LB.filter(r => r.family === f.fam).length;
+  return `<section id="${f.id}">
+    <div class="sec-head"><span class="eyebrow">${f.eyebrow}</span></div>
+    <div class="card">
+      <div class="fam-top"><h2>${f.title}</h2><span class="best">best <b>${f.fam === "Baseline" ? "0.500" : f3(best)}</b> · ${n} run${n === 1 ? "" : "s"}</span></div>
+      <div class="grid2"><div><span class="lbl">How it works</span><p>${f.how}</p></div><div><span class="lbl">Why we tried it</span><p>${f.why}</p></div></div>
+      ${f.chart === "boost" ? `<div class="sub"><h3>Default vs. tuned, and tree depth</h3><div class="legend"><span><i class="sw open"></i>Library defaults</span><span><i class="sw"></i>Tuned</span></div><div class="rc" id="ch-boost" style="--lw:200px"></div><div class="rc" id="ch-depth" style="--lw:200px"></div><p class="note">Axis starts at 0.65.</p></div>` : ""}
+      ${CURVES.curves[f.fam] || f.fam === "Baseline" ? `<div class="sub"><h3>How this model sees each sensor</h3><p class="cap">The line is this model's average predicted risk as one sensor changes, other sensors kept at their real values. Grey dots are the actual share needing maintenance in each band of readings. Hover or tap a chart for values.</p><div class="pd-grid" data-fam="${f.fam}"></div></div>` : ""}
+      ${f.subs.map(s => `<div class="sub">${s.name ? `<h3>${s.name}</h3>` : ""}${s.text ? `<p class="cap">${s.text}</p>` : ""}${rowsTable(s.rows)}</div>`).join("")}
+      <div class="learned"><span class="lbl">What we learned</span><p>${f.learned}</p></div>
+    </div></section>`;
+}).join("");
+
+document.getElementById("tricks-body").innerHTML = TRICKS.map(t => `<tr><td><b>${esc(t[0])}</b></td><td>${esc(t[1])}</td><td>${esc(t[2])}</td></tr>`).join("");
+
+/* ---------- risk curves ---------- */
+function svgEl(t, a, parent) { const e = document.createElementNS(NS, t); for (const k in a) e.setAttribute(k, a[k]); if (parent) parent.append(e); return e; }
+function niceTicks(a, b, n) {
+  const raw = (b - a) / n, mag = 10 ** Math.floor(Math.log10(raw)), st = [1, 2, 2.5, 5, 10].map(s => s * mag).find(s => s >= raw);
+  const out = []; for (let v = Math.ceil(a / st) * st; v <= b + 1e-9; v += st) out.push(+v.toFixed(6)); return out;
+}
+const pct = v => Math.round(v * 100) + "%";
+const fmtX = (v, span) => span >= 100 ? Math.round(v).toLocaleString() : span >= 10 ? v.toFixed(1) : v.toFixed(2);
+// cfg: { x:[a,b], y:[a,b], h, grid, series:[{y, cls, name}], obs:[{x,rate,n}], base, unit, label }
+function lineChart(el, cfg) {
+  let lastW = -1;
+  function draw() {
+    const W = el.clientWidth; if (!W || W === lastW) return; lastW = W;
+    const H = cfg.h || 150, m = { l: 34, r: 10, t: 8, b: 22 };
+    const [x0, x1] = cfg.x, [y0, y1] = cfg.y, span = x1 - x0;
+    const X = v => m.l + (v - x0) / span * (W - m.l - m.r), Y = v => m.t + (1 - (Math.min(Math.max(v, y0), y1) - y0) / (y1 - y0)) * (H - m.t - m.b);
+    const svg = svgEl("svg", { width: W, height: H, viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": cfg.label });
+    for (const v of [0.2, 0.4, 0.6, 0.8, 1.0].filter(v => v >= y0 && v <= y1)) {
+      svgEl("line", { x1: m.l, x2: W - m.r, y1: Y(v), y2: Y(v), class: "gridl" }, svg);
+      svgEl("text", { x: m.l - 6, y: Y(v) + 4, "text-anchor": "end", class: "tick" }, svg).textContent = pct(v);
+    }
+    for (const v of niceTicks(x0, x1, W < 300 ? 3 : 5))
+      svgEl("text", { x: X(v), y: H - 5, "text-anchor": "middle", class: "tick" }, svg).textContent = (+v.toFixed(2)).toLocaleString();
+    if (cfg.base != null) svgEl("line", { x1: m.l, x2: W - m.r, y1: Y(cfg.base), y2: Y(cfg.base), class: "basel" }, svg);
+    for (const o of cfg.obs) if (o.x >= x0 && o.x <= x1) svgEl("circle", { cx: X(o.x), cy: Y(o.rate), r: 2.6, class: "obs" }, svg);
+    const order = [...cfg.series].sort((a, b) => (a.cls === "dim" ? 0 : 1) - (b.cls === "dim" ? 0 : 1));
+    for (const s of order) svgEl("path", { d: s.y.map((v, i) => (i ? "L" : "M") + X(cfg.grid[i]).toFixed(1) + " " + Y(v).toFixed(1)).join(""), class: "pdl " + (s.cls || "") }, svg);
+    const xh = svgEl("line", { y1: m.t, y2: H - m.b, class: "xh", visibility: "hidden" }, svg);
+    const shown = cfg.series.filter(s => s.cls !== "dim");
+    const dots = shown.map(s => svgEl("circle", { r: 4, class: "xdot", fill: s.cls === "ref" ? "var(--hi)" : "var(--accent)", visibility: "hidden" }, svg));
+    const hit = svgEl("rect", { x: m.l, y: 0, width: W - m.l - m.r, height: H, class: "hit" }, svg);
+    const move = e => {
+      const r = svg.getBoundingClientRect(), xv = x0 + (e.clientX - r.left - m.l) / (W - m.l - m.r) * span;
+      let i = 0; cfg.grid.forEach((g, j) => { if (Math.abs(g - xv) < Math.abs(cfg.grid[i] - xv)) i = j; });
+      const gx = X(cfg.grid[i]); xh.setAttribute("x1", gx); xh.setAttribute("x2", gx); xh.setAttribute("visibility", "visible");
+      shown.forEach((s, k) => { dots[k].setAttribute("cx", gx); dots[k].setAttribute("cy", Y(s.y[i])); dots[k].setAttribute("visibility", "visible"); });
+      const ob = cfg.obs.reduce((a, o) => Math.abs(o.x - cfg.grid[i]) < Math.abs(a.x - cfg.grid[i]) ? o : a);
+      tip.show(e, `${esc(cfg.label)} <b>${fmtX(cfg.grid[i], span)} ${esc(cfg.unit)}</b><br>` + shown.map(s => `${esc(s.name)}: <b>${pct(s.y[i])}</b>`).join("<br>") + `<br>Actual, nearby band: <b>${pct(ob.rate)}</b>`);
+    };
+    hit.addEventListener("pointermove", move); hit.addEventListener("pointerdown", move);
+    hit.addEventListener("pointerleave", () => { tip.hide(); xh.setAttribute("visibility", "hidden"); dots.forEach(d => d.setAttribute("visibility", "hidden")); });
+    el.innerHTML = ""; el.append(svg);
+  }
+  if (el._ro) el._ro.disconnect();
+  el._ro = new ResizeObserver(draw); el._ro.observe(el); draw();
+}
+const SENS = ["Engine RPM", "Fuel Pressure", "Lub Oil Temp", "Lub Oil Pressure", "Coolant Pressure", "Coolant Temp"];
+const YD = [0.2, 1.0];
+const famCurve = (fam, s) => fam === "Baseline" ? CURVES.grid[s].map(() => CURVES.base_rate) : CURVES.curves[fam].y[s];
+const MODEL_NAME = { "Baseline": "Baseline", "Linear": "Logistic regression", "Naive Bayes": "KDE naive Bayes", "k-nearest neighbours": "kNN, k = 600", "Tree ensembles (RF / ET)": "Extra trees", "Neural network": "MLP 128 → 64", "Gradient boosting": "CatBoost tuned", "Additive (GAM / splines)": "GAM, 20 splines" };
+document.querySelectorAll(".pd-grid").forEach(g => {
+  const fam = g.dataset.fam;
+  g.innerHTML = SENS.map((s, i) => `<div class="pd"><h4>${s} <small>${CURVES.units[s]}</small></h4><div class="lc" id="pd-${g.dataset.fam.replace(/\W+/g, "")}-${i}"></div></div>`).join("");
+  SENS.forEach((s, i) => lineChart(g.querySelector(`#pd-${fam.replace(/\W+/g, "")}-${i}`), {
+    x: [CURVES.grid[s][0], CURVES.grid[s].at(-1)], y: YD, h: 140, grid: CURVES.grid[s], obs: CURVES.observed[s], unit: CURVES.units[s], label: s,
+    series: [{ y: famCurve(fam, s), name: MODEL_NAME[fam] }] }));
+});
+// comparison chart
+const CMP = ["Linear", "Naive Bayes", "k-nearest neighbours", "Tree ensembles (RF / ET)", "Neural network", "Gradient boosting"];
+const CMP_NOTE = {
+  "Linear": "Logistic regression can only draw an S-shaped curve that keeps going the same way, so it misses where the real effect bends or flattens.",
+  "Naive Bayes": "Naive Bayes follows the GAM almost exactly on RPM, the sensor that matters most. On the weak sensors its curves wander by a few points, but those sensors barely move the risk, so it still scores close to the GAM.",
+  "k-nearest neighbours": "kNN's curves are flatter: averaging 600 neighbours blurs the effect, and treating all sensors as equally important dilutes RPM.",
+  "Tree ensembles (RF / ET)": "Tree models build curves out of steps. Averaging 500 trees smooths them, but large leaves pull the extremes toward the middle (87% at the lowest RPM vs 91% for the GAM).",
+  "Neural network": "The neural net learns smooth curves very close to the GAM's, without being told the effects are separate.",
+  "Gradient boosting": "Boosting follows the same shape as the GAM, built from small steps. That's why the two score the same."
+};
+let cmpSensor = SENS[0], cmpFam = "Linear";
+function seg(host, items, cur, on) {
+  host.innerHTML = items.map(([k, l]) => `<button type="button" data-k="${esc(k)}" aria-pressed="${k === cur}">${esc(l)}</button>`).join("");
+  host.querySelectorAll("button").forEach(b => b.addEventListener("click", () => { host.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b)); on(b.dataset.k); }));
+}
+function drawCmp() {
+  const s = cmpSensor;
+  const series = CMP.filter(f => f !== cmpFam).map(f => ({ y: famCurve(f, s), cls: "dim", name: MODEL_NAME[f] }));
+  series.push({ y: famCurve("Additive (GAM / splines)", s), cls: "ref", name: "GAM" }, { y: famCurve(cmpFam, s), name: MODEL_NAME[cmpFam] });
+  document.getElementById("cmp-legend").innerHTML = `<span><i class="sw line"></i>${esc(MODEL_NAME[cmpFam])}</span><span><i class="sw line ref"></i>GAM (recommended)</span><span><i class="sw line dim"></i>Other families</span><span><i class="sw obs"></i>Actual share, per band</span><span><i class="sw base"></i>Overall average, ${pct(CURVES.base_rate)}</span>`;
+  document.getElementById("cmp-cap").textContent = CMP_NOTE[cmpFam];
+  const el = document.getElementById("ch-cmp");
+  lineChart(el, { x: [CURVES.grid[s][0], CURVES.grid[s].at(-1)], y: YD, h: 280, grid: CURVES.grid[s], obs: CURVES.observed[s], unit: CURVES.units[s], label: s, base: CURVES.base_rate, series });
+}
+seg(document.getElementById("seg-sensor"), SENS.map(s => [s, s]), cmpSensor, k => { cmpSensor = k; drawCmp(); });
+seg(document.getElementById("seg-fam"), CMP.map(f => [f, MODEL_NAME[f]]), cmpFam, k => { cmpFam = k; drawCmp(); });
+drawCmp();
+
+/* ---------- overview chart ---------- */
+const ORDER = ["Linear", "k-nearest neighbours", "Naive Bayes", "Tree ensembles (RF / ET)", "Neural network", "Gradient boosting", "Ensemble / stack", "Additive (GAM / splines)"];
+const SHORT = { "Additive (GAM / splines)": "Additive (GAM, spline, EBM)", "Ensemble / stack": "Ensembles / stacking", "k-nearest neighbours": "k-nearest neighbours", "Gradient boosting": "Gradient boosting", "Neural network": "Neural networks", "Tree ensembles (RF / ET)": "Random forest / extra trees", "Naive Bayes": "Naive Bayes", "Linear": "Logistic regression" };
+rowChart(document.getElementById("ch-overview"), {
+  domain: [0.66, 0.71], ticks: [0.66, 0.67, 0.68, 0.69, 0.70, 0.71], fmt: v => v.toFixed(2),
+  rows: ORDER.map(fam => {
+    const rs = LB.filter(r => r.family === fam).sort((a, b) => a.auc - b.auc), best = rs[rs.length - 1];
+    const n = rs.length, h = n > 20 ? 46 : n > 6 ? 38 : 30;
+    return { label: SHORT[fam], sub: `${n} run${n > 1 ? "s" : ""} · best ${f3(best.auc)}`, h,
+      marks: rs.map((r, i) => ({ v: r.auc, dy: n > 6 ? ((i % 5) - 2) * (n > 20 ? 7 : 5) : 0, cls: r === best ? "hi" : (r.honest ? "" : "open"),
+        tip: `${esc(r.desc)}<br><b>${f4(r.auc)}</b> CV AUC${r.std ? ` ± ${f3(r.std)}` : ""}<br>${r.honest ? "Fixed or nested-tuned settings" : "Settings picked on the same folds"} · ${esc(r.who)}` })) };
+  })
+});
+
+/* ---------- boosting charts ---------- */
+const BO = [["scikit-learn GB", 0.7007, 0.7020], ["scikit-learn HistGB", 0.6957, 0.7003], ["XGBoost", 0.6620, 0.7018], ["LightGBM", 0.6896, 0.7025], ["CatBoost", 0.6915, 0.7030]];
+rowChart(document.getElementById("ch-boost"), {
+  domain: [0.65, 0.71], ticks: [0.65, 0.67, 0.69, 0.71], fmt: v => v.toFixed(2),
+  rows: BO.map(b => ({ label: b[0], sub: `+${(b[2] - b[1]).toFixed(4)} from tuning`, line: [b[1], b[2]],
+    marks: [{ v: b[1], cls: "open", tip: `${b[0]} defaults<br><b>${f4(b[1])}</b>` }, { v: b[2], tip: `${b[0]} tuned<br><b>${f4(b[2])}</b>` }] }))
+});
+const DE = [[1, 0.7023], [2, 0.7031], [3, 0.7014], [4, 0.6992]];
+rowChart(document.getElementById("ch-depth"), {
+  domain: [0.65, 0.71], ticks: [0.65, 0.67, 0.69, 0.71], fmt: v => v.toFixed(2),
+  rows: [{ label: "CatBoost tree depth 1 → 4", sub: "Deeper trees allow more interactions", h: 34,
+    marks: DE.map(d => ({ v: d[1], cls: d[0] === 2 ? "hi" : "", r: 4 + d[0], tip: `CatBoost depth ${d[0]}<br><b>${f4(d[1])}</b>` })) }]
+});
+
+/* ---------- test chart + table ---------- */
+const TEST = [...DATA.test].sort((a, b) => a.auc - b.auc);
+rowChart(document.getElementById("ch-test"), {
+  domain: [0.68, 0.735], ticks: [0.68, 0.69, 0.70, 0.71, 0.72, 0.73], fmt: v => v.toFixed(2),
+  rows: TEST.map(t => ({ label: t.name, sub: t.by,
+    marks: [{ v: t.auc, lo: t.lo, hi: t.hi, cls: t.name.startsWith("GAM") ? "hi" : "", tip: `${esc(t.name)}<br><b>${f4(t.auc)}</b> (95% CI ${f3(t.lo)} to ${f3(t.hi)})` }] }))
+});
+document.getElementById("test-body").innerHTML = [...DATA.test].sort((a, b) => b.auc - a.auc).map(t =>
+  `<tr class="${t.name.startsWith("GAM") ? "top" : ""}"><td>${esc(t.name)}${t.name.startsWith("GAM") ? ` <span class="tag best">recommended</span>` : ""}</td><td>${esc(t.by)}</td><td class="n">${f4(t.auc)}</td><td class="n">${f3(t.lo)} to ${f3(t.hi)}</td><td class="n">${f4(t.brier)}</td></tr>`).join("");
+
+/* ---------- all runs table ---------- */
+const famSel = document.getElementById("f-fam"), q = document.getElementById("f-q"), tb = document.querySelector("#runs tbody");
+[...new Set(LB.map(r => r.family))].sort().forEach(f => famSel.add(new Option(f, f)));
+let sortK = "auc", sortDir = -1;
+function renderRuns() {
+  const s = q.value.trim().toLowerCase();
+  const rs = LB.filter(r => (!famSel.value || r.family === famSel.value) && (!s || (r.desc + " " + r.name + " " + r.family).toLowerCase().includes(s)))
+    .sort((a, b) => { const x = a[sortK], y = b[sortK]; return (typeof x === "number" ? x - y : String(x).localeCompare(String(y))) * sortDir; });
+  tb.innerHTML = rs.map(r => `<tr><td>${esc(r.desc)}${r.honest ? "" : ` <span class="tag" title="Settings picked on the same folds">same-fold</span>`}<span class="d">${esc(r.name)}</span></td><td>${esc(r.family)}</td><td>${esc(r.who)}</td><td class="n">${f4(r.auc)}</td><td class="n">${r.std ? f4(r.std) : "–"}</td><td class="n">${r.pr ? f3(r.pr) : "–"}</td></tr>`).join("");
+  document.getElementById("f-count").textContent = `${rs.length} of ${LB.length} runs`;
+}
+document.querySelectorAll("#runs th").forEach(th => th.addEventListener("click", () => {
+  const k = th.dataset.k; sortDir = sortK === k ? -sortDir : (k === "auc" || k === "pr" || k === "std" ? -1 : 1); sortK = k;
+  document.querySelectorAll("#runs th").forEach(h => h.removeAttribute("aria-sort"));
+  th.setAttribute("aria-sort", sortDir === 1 ? "ascending" : "descending"); renderRuns();
+}));
+famSel.addEventListener("change", renderRuns); q.addEventListener("input", renderRuns);
+renderRuns();
+</script>

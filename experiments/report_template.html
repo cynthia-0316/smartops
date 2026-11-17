@@ -146,7 +146,7 @@ footer { padding-block: 48px 64px; color: var(--muted); font-size: 0.82rem; disp
     <h3>What we found</h3>
     <ul>
       <li><b>Best model: a GAM</b> (a smooth curve per sensor, added up). It ties the best gradient-boosting models and is faster, easier to explain and well calibrated.</li>
-      <li><b>The limit is the data, not the algorithm.</b> Boosting, neural nets, random forests, stacks and ensembles all stop at 0.703 to 0.705 cross-validated AUC and about 0.71 on the test set. We estimate the ceiling for this data at about 0.707.</li>
+      <li><b>The limit is the data, not the algorithm.</b> Boosting, neural nets, random forests, stacks and ensembles all stop at 0.703 to 0.705 cross-validated AUC and about 0.71 on the test set. Models that can learn sensor combinations do no better than ones that can't.</li>
       <li><b>Engine RPM carries most of the signal.</b> Low RPM goes with "Needs Maintenance". Fuel pressure, lub oil temperature and lub oil pressure add a little; the coolant sensors add almost nothing.</li>
       <li><b>The business gain is modest.</b> 63% of engines are labelled "Needs Maintenance", so random picking is already right 63% of the time. The model's top 10% is right about 91% of the time.</li>
     </ul>
@@ -193,7 +193,7 @@ footer { padding-block: 48px 64px; color: var(--muted); font-size: 0.82rem; disp
 
 <section id="models" aria-labelledby="h-models">
   <div class="sec-head"><span class="eyebrow">3 · Model results</span><h2 id="h-models">Every model type lands in one narrow band</h2>
-  <p>Best cross-validated AUC for each kind of model we tried. Bars show ±1 standard deviation across the 15 folds. The dashed line is the estimated ceiling for this data.</p></div>
+  <p>Best cross-validated AUC for each kind of model we tried. Bars show ±1 standard deviation across the 15 folds.</p></div>
   <div class="card">
     <div class="controls"><div class="seg" role="group" aria-label="Which scores to show">
       <button type="button" id="b-key" aria-pressed="true">Key models</button><button type="button" id="b-honest" aria-pressed="false">Honest scores only</button></div></div>
@@ -201,7 +201,7 @@ footer { padding-block: 48px 64px; color: var(--muted); font-size: 0.82rem; disp
     <p class="note">"Honest" means the score was not used to pick the model's settings (defaults, nested CV, or settings chosen automatically inside each fit). The always-guess baselines (AUC 0.50) are left off the scale. All 99 runs are in <a href="#all">All runs</a>.</p>
   </div>
   <div class="grid2">
-    <div class="card"><h3>Tuning helps, but only up to the same ceiling</h3>
+    <div class="card"><h3>Tuning helps, but every library ends at the same score</h3>
       <div class="legend"><span><i class="dot" style="background:var(--muted)"></i>Default settings</span><span><i class="dot" style="background:var(--accent)"></i>Tuned (nested CV)</span></div>
       <div class="chart" id="c-tune"></div>
       <p class="cap">XGBoost's defaults overfit badly and gain the most. After tuning, all five boosting libraries end within 0.003 AUC of each other.</p></div>
@@ -213,8 +213,8 @@ footer { padding-block: 48px 64px; color: var(--muted); font-size: 0.82rem; disp
 <section id="why" aria-labelledby="h-why">
   <div class="sec-head"><span class="eyebrow">4 · Why everything plateaus</span><h2 id="h-why">The signal is weak and adds up sensor by sensor</h2></div>
   <div class="grid2">
-    <div class="card"><h3>Estimated ceiling</h3><div class="chart" id="c-ceiling"></div>
-      <p class="cap">If our best model's probabilities were exactly right, simulating new labels from them gives an AUC of about 0.707. Our models already reach 0.704 in CV and 0.71 on test, so little room is left.</p></div>
+    <div class="card"><h3>Flexible models barely beat simple ones</h3><div class="chart" id="c-simple"></div>
+      <p class="cap">Engine RPM alone reaches 0.67, and plain linear logistic regression is close behind the GAM. Letting the model bend its curves adds a little; nothing beyond that adds more.</p></div>
     <div class="card"><h3>Evidence</h3>
       <div class="tbl-wrap" style="border:0"><table id="t-why" class="wraptbl"></table></div></div>
   </div>
@@ -339,7 +339,7 @@ const gam = D.test.find(t => t.name.startsWith('GAM')), cb = D.test.find(t => t.
 const honestGam = D.leaderboard.find(r => r.name === 'pygam_ns20');
 const tiles = [
   { v: f3(gam.auc), l: 'Test ROC AUC of the recommended GAM (95% CI ' + f3(gam.lo) + '–' + f3(gam.hi) + ')', key: true },
-  { v: '≈' + f3(D.facts.ceiling), l: 'Estimated best possible AUC for this data' },
+  { v: f3(honestGam.auc), l: 'Cross-validated AUC of the GAM (15 folds)' },
   { v: (D.facts.n_experiments + D.facts.n_team_runs), l: 'Model configurations scored with the shared protocol' },
   { v: pct(D.dataset.pos_share), l: 'Engines labelled "Needs Maintenance"' },
 ];
@@ -462,9 +462,8 @@ function drawAll() {
   const fs = D.leaderboard.filter(r => r.name.startsWith('CatBoost (params from #13)')).map(r => ({ label: (r.name.match(/\[(.*)\]/) || [, 'raw (6 sensors)'])[1].replace('raw+own', 'raw + 4 own').replace('all', 'all 22 columns'), v: r.auc, sd: r.std, vl: f4(r.auc), tip: `<b>${r.name}</b><br>AUC ${f4(r.auc)} ± ${f4(r.std)}` }));
   hbars($('#c-feat'), fs.sort((a, b) => b.v - a.v).map((r, i) => Object.assign(r, { c: i === 0 ? 'var(--accent)' : 'var(--muted)' })), { d0: 0.68, d1: 0.715, base: 0.68, nt: 3, lw: 170, pad: 90 });
 
-  // ceiling
-  dots($('#c-ceiling'), [
-    { label: 'Estimated ceiling', v: D.facts.ceiling, lo: D.facts.ceiling - 2 * D.facts.ceiling_sd, hi: D.facts.ceiling + 2 * D.facts.ceiling_sd, c: 'var(--ink-2)', tip: `<b>Estimated ceiling</b><br>${f4(D.facts.ceiling)} (±2 sd ${f4(2 * D.facts.ceiling_sd)})` },
+  // GAM vs simple baselines
+  dots($('#c-simple'), [
     { label: 'GAM, test set', v: gam.auc, lo: gam.lo, hi: gam.hi, c: 'var(--accent)', hl: true, tip: `<b>GAM on test</b><br>${f4(gam.auc)} (${f3(gam.lo)}–${f3(gam.hi)})` },
     { label: 'GAM, cross-validation', v: honestGam.auc, lo: honestGam.auc - honestGam.std, hi: honestGam.auc + honestGam.std, c: 'var(--accent)', tip: `<b>GAM CV</b><br>${f4(honestGam.auc)} ± ${f4(honestGam.std)}` },
     { label: 'Linear logistic regression', v: L('lr_linear').auc, lo: L('lr_linear').auc - L('lr_linear').std, hi: L('lr_linear').auc + L('lr_linear').std, tip: `<b>Linear LR</b><br>${f4(L('lr_linear').auc)}` },
@@ -545,7 +544,7 @@ function drawBoard() {
     const hl = r.name === 'pygam_ns20';
     out.push({ label: NICE[r.name] || r.name, v: r.auc, lo: r.auc - r.std, hi: r.auc + r.std, hl, c: hl ? 'var(--accent)' : 'var(--muted)',
       tip: `<b>${NICE[r.name] || r.name}</b><br>CV AUC ${f4(r.auc)} ± ${f4(r.std)}<br>PR AUC ${f4(r.pr)}<br>${r.honest ? 'Honest score' : 'Settings picked on these folds (slightly optimistic)'}<br>Run by ${r.who}` }); }); });
-  dots($('#c-board'), out, { d0: 0.68, d1: 0.715, nt: 7, ref: D.facts.ceiling, refLabel: 'ceiling ≈ ' + f3(D.facts.ceiling) });
+  dots($('#c-board'), out, { d0: 0.68, d1: 0.715, nt: 7 });
 }
 $('#b-key').onclick = () => { boardMode = 'key'; $('#b-key').setAttribute('aria-pressed', 'true'); $('#b-honest').setAttribute('aria-pressed', 'false'); drawBoard(); };
 $('#b-honest').onclick = () => { boardMode = 'honest'; $('#b-honest').setAttribute('aria-pressed', 'true'); $('#b-key').setAttribute('aria-pressed', 'false'); drawBoard(); };
