@@ -107,7 +107,7 @@ for n, pp in preds.items():
                  "brier": float(brier_score_loss(yt, pp)), "by": "Rishabh (#18)" if n in ("CatBoost tuned", "LightGBM tuned", "GradientBoosting tuned") else "Uzair (improvement)",
                  "fpr": fpr[k].round(4).tolist(), "tpr": tpr[k].round(4).tolist()})
 D["test"] = test
-D["facts"] = {"ceiling": 0.7073, "ceiling_sd": 0.0040, "n_experiments": int(len(log)), "n_team_runs": int(len(team)),
+D["facts"] = {"n_experiments": int(len(log)), "n_team_runs": int(len(team)),
               "interaction_ebm": [0.0003, 0.175], "interaction_cb": [0.0008, 0.460], "max_corr_within_class": 0.09}
 
 # Figures (embedded)

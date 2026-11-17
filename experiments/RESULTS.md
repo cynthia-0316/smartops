@@ -11,8 +11,6 @@ All configs and scores: `log.csv`.
 - Signal is additive: EBM with 15 pairwise interactions scores +0.0003 AUC over no interactions (p = 0.18);
   CatBoost depth 2 vs depth 1 +0.0008 (p = 0.46). Interaction importances are all at noise level.
 - No leakage through row order (label autocorrelation equals chance).
-- Ceiling estimate: if the additive model's probabilities were the true ones, the best achievable AUC
-  would be about 0.707 (simulation). Our models reach 0.703 in CV and 0.710 on test.
 
 ## Nested-CV (honest) results
 | Model | CV AUC |
@@ -47,8 +45,8 @@ simple and stacked ensembles (+0.0005, not significant). TabPFN not run: needs a
 - **Modern neural nets** (piecewise-linear encoding + MLP, 5-net deep ensembles, early stopping): 0.7013 to 0.7032.
 - **Ensembles** of GAM + CatBoost + neural net: 0.7045 to 0.7046 (+0.0005 over GAM, p > 0.3).
 
-**Conclusion:** every family converges to CV AUC 0.703 to 0.705 and test AUC about 0.71, matching the
-estimated ceiling (about 0.707). Recommended: additive model (spline LR or penalised GAM).
+**Conclusion:** every family converges to CV AUC 0.703 to 0.705 and test AUC about 0.71; further
+gains would likely need new information (more sensors, time series) rather than more complex models. Recommended: additive model (spline LR or penalised GAM).
 
 ## Reproduce
 ```bash
