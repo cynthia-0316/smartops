@@ -57,4 +57,4 @@ The notebook ran top to bottom in Colab (Python 3.13, scikit-learn 1.6.1, pandas
 - Stored test predictions of the six finalists recompute to the saved AUCs.
 - Cost scenarios (hypothetical): at a miss cost 3x or more the cost-optimal rule flags ~everyone and saves nothing versus inspecting all.
 
-**Still to do:** run the last cell of the notebook (or rerun all after the latest push) to produce , then commit it here. The notebook was edited once after that first run (cosmetic: one stray array output removed).
+**Still to do:** run the last cell of the notebook (or rerun all after the latest push) to produce `SmartOps_Final_Colab_Analysis.html`, then commit it here. The notebook was edited once after that first run (cosmetic: one stray array output removed).
