@@ -68,28 +68,25 @@
 <section id="predict" class="tab" aria-labelledby="h-predict" hidden>
   <h1 id="h-predict">Single engine check</h1>
   <p class="lead">Enter the six readings. The model returns the predicted probability of the <em>Needs Maintenance</em> label and compares it with your inspection threshold.</p>
-  <div class="two wide-left">
-    <form id="form" class="panel" novalidate>
-      <h2>Sensor readings</h2>
-      <div id="fields" class="fields"></div>
-      <div class="field">
-        <label for="thr-pred">Inspection threshold <output id="thr-pred-out"></output></label>
-        <input id="thr-pred" type="range" min="0.05" max="0.95" step="0.01">
-        <span class="hint">Risk categories depend on this configurable business threshold. They are not engineering safety limits.</span>
-      </div>
-      <div class="row">
-        <button type="submit" class="btn primary">Analyze Engine</button>
-        <button type="button" id="btn-example" class="btn">Load example engine</button>
-        <button type="reset" class="btn ghost" id="btn-clear">Clear</button>
-      </div>
-      <p class="hint" id="example-note"></p>
-      <div id="form-errors" class="errors" role="alert" hidden></div>
-    </form>
-
-    <div class="panel" id="result" aria-live="polite">
-      <h2>Result</h2>
-      <p class="muted">Enter readings and press <strong>Analyze Engine</strong>.</p>
+  <form id="form" class="panel" novalidate>
+    <h2>Sensor readings</h2>
+    <div id="fields" class="fields three"></div>
+    <div class="field">
+      <label for="thr-pred">Inspection threshold <output id="thr-pred-out"></output></label>
+      <input id="thr-pred" type="range" min="0.05" max="0.95" step="0.01">
+      <span class="hint">Risk categories depend on this configurable business threshold. They are not engineering safety limits.</span>
     </div>
+    <div class="row">
+      <button type="submit" class="btn primary">Analyze Engine</button>
+      <button type="button" id="btn-example" class="btn">Load example engine</button>
+      <button type="reset" class="btn ghost" id="btn-clear">Clear</button>
+    </div>
+    <p class="hint" id="example-note"></p>
+    <div id="form-errors" class="errors" role="alert" hidden></div>
+  </form>
+
+  <div id="result" aria-live="polite">
+    <div class="panel"><h2>Result</h2><p class="muted">Enter readings and press <strong>Analyze Engine</strong>. You will get the risk, why the engine was flagged, and what to check first.</p></div>
   </div>
 </section>
 

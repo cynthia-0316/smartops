@@ -5,7 +5,7 @@
   "description": "SmartOps predictive maintenance decision dashboard (static site, in-browser inference)",
   "scripts": {
     "start": "node serve.js 8080",
-    "test": "node --test tests/core.test.js"
+    "test": "node --test tests/core.test.js tests/explain.test.js"
   },
   "engines": { "node": ">=18" }
 }

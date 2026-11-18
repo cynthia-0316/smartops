@@ -132,3 +132,32 @@ svg .ttl{fill:var(--ink);font-weight:600}
   .top-in{gap:6px;padding-top:6px}
 }
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+
+/* ---- Predict page: explanation sections ---- */
+.fields.three{grid-template-columns:repeat(3,1fr)}
+.errors.big{font-size:15px;margin:0 0 14px}
+.errors.big p{margin:8px 0 0}
+.card.warn{border-color:#f1d6a8;background:var(--amber-soft)}
+.kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:14px 0}
+.kv div{background:#f7f9fd;border:1px solid var(--line);border-radius:10px;padding:10px 14px}
+.kv span{display:block;font-size:12.5px;color:var(--muted);font-weight:600;margin-bottom:2px}
+.kv strong{font-size:14.5px;font-weight:650}
+.tag-line{margin:0 0 8px}
+td.wrap{white-space:normal;min-width:260px;max-width:420px;font-size:13.5px;text-align:left}
+.steps{margin:0;padding-left:0;list-style:none;counter-reset:st}
+.steps li{counter-increment:st;position:relative;padding:10px 12px 10px 42px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;background:#fff}
+.steps li::before{content:counter(st);position:absolute;left:12px;top:10px;width:22px;height:22px;border-radius:50%;background:var(--blue-soft);color:var(--blue-ink);font-weight:700;font-size:12.5px;display:grid;place-items:center}
+.steps li.caution{border-color:#f1d6a8;background:var(--amber-soft)}
+.steps li.caution::before{background:#fde3b0;color:var(--amber)}
+.steps .kind{display:block;font-size:11.5px;letter-spacing:.04em;text-transform:uppercase;font-weight:700;color:var(--muted);margin-bottom:2px}
+@media (max-width:860px){.fields.three{grid-template-columns:1fr 1fr}}
+@media (max-width:520px){.fields.three{grid-template-columns:1fr}}
+.drivers{display:grid;gap:10px;margin:12px 0}
+.driver{border:1px solid var(--line);border-left:4px solid #9aa6bd;border-radius:10px;padding:10px 14px;background:#fff}
+.driver.up{border-left-color:#c2410c}
+.driver.down{border-left-color:var(--blue)}
+.driver .dh{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center}
+.driver .val{font-weight:650;color:var(--blue-ink)}
+.driver .dm{font-size:12.5px;color:var(--muted);margin:2px 0 4px}
+.driver p{margin:0;font-size:14px}
+#result{scroll-margin-top:72px}

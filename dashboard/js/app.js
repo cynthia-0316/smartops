@@ -157,7 +157,7 @@
     const ex = art.reference.X[0];
     $('example-note').textContent = 'The example is a real row from the held-out test set. Its label is not shown.';
     $('btn-example').onclick = () => { ex.forEach((v, i) => { $('in-' + i).value = Number(v.toFixed(4)); $('in-' + i).removeAttribute('aria-invalid'); }); $('form-errors').hidden = true; };
-    $('btn-clear').onclick = () => { setTimeout(() => { state.lastRow = null; $('form-errors').hidden = true; $('result').innerHTML = '<h2>Result</h2><p class="muted">Enter readings and press <strong>Analyze Engine</strong>.</p>'; }, 0); };
+    $('btn-clear').onclick = () => { setTimeout(() => { state.lastRow = null; $('form-errors').hidden = true; $('result').innerHTML = '<div class="panel"><h2>Result</h2><p class="muted">Enter readings and press <strong>Analyze Engine</strong>.</p></div>'; }, 0); };
     $('form').addEventListener('submit', (e) => {
       e.preventDefault();
       const raw = {};
@@ -176,37 +176,68 @@
       box.hidden = true;
       state.lastRow = {values: v.values, warnings: v.warnings};
       renderResult();
+      $('result').scrollIntoView({block: 'start'});
     });
   }
 
   function renderResult() {
-    const {values, warnings} = state.lastRow;
-    const p = model.predict(values);
+    const {values} = state.lastRow;
     const thr = state.threshold;
+    const E = C.explainPrediction(model, values, thr);
+    const p = E.p;
     const c = C.confusionAt(oof, thrIdx());
     const pctile = C.scorePercentile(oof.score_quantiles, p);
-    const level = p >= thr ? 'hi' : p >= thr - 0.1 ? 'mid' : 'lo';
-    const label = {hi: 'Above threshold: recommend inspection', mid: 'Near threshold: watch closely', lo: 'Below threshold: routine monitoring'}[level];
-    const action = {
-      hi: 'Add this engine to the inspection list and have a technician review it. Check the sensors that contribute most (below) and confirm the readings are not a sensor fault.',
-      mid: 'Keep the normal schedule, and re-check soon or at the next reading. If capacity allows, review it with the higher-risk engines.',
-      lo: 'No extra inspection is suggested by the model. Keep routine checks and normal safety procedures: a low score is not a guarantee.'
-    }[level];
-    const contrib = model.contributions(values);
-    const items = contrib.map((v, j) => ({label: F[j], v: v, sub: `${values[j]} ${U[j]}`})).sort((a, b) => Math.abs(b.v) - Math.abs(a.v));
-    const intercept = model.intercept;
+    const level = !E.reliable && E.level !== 'hi' ? 'mid' : E.level;
+    const label = {hi: 'Above threshold: recommend inspection', mid: E.reliable ? 'Near threshold: watch closely' : 'Verify readings first', lo: 'Below threshold'}[level];
+    const oddsFmt = (f) => (f > 1000 ? '>1,000×' : f < 0.001 ? '<0.001×' : f.toFixed(2) + '×');
+    const items = E.items.map((it) => ({label: it.name, v: it.contribution, sub: C.withUnit(it.value, it.unit)})).sort((a, b) => Math.abs(b.v) - Math.abs(a.v));
+
+    const warn = E.reliable ? '' :
+      `<div class="errors warn big" role="alert"><strong>Reliability warning: the model is extrapolating.</strong>` +
+      `<ul>${E.outOfRange.map((i) => `<li>${esc(i.name)} = ${esc(C.withUnit(i.value, i.unit))} is outside the training range (${esc(C.withUnit(i.trainMin, i.unit))} to ${esc(C.withUnit(i.trainMax, i.unit))}).</li>`).join('')}</ul>` +
+      `<p>The score below was computed as usual but may not be dependable. Verify the reading and request human review. A low score here is not a reason for routine monitoring.</p></div>`;
+
+    const driverCard = (it) =>
+      `<div class="driver ${it.direction}"><div class="dh"><strong>${esc(it.name)}</strong><span class="val">${esc(C.withUnit(it.value, it.unit))}</span>` +
+      `<span class="tag ${it.direction === 'up' ? 'y' : 'n'}">${it.direction === 'up' ? '▲ raises risk' : '▼ lowers risk'} · odds ${esc(oddsFmt(it.oddsFactor))}</span></div>` +
+      `<div class="dm">Development median ${esc(C.withUnit(it.median, it.unit))} · typical ${esc(C.withUnit(it.p25, it.unit))} to ${esc(C.withUnit(it.p75, it.unit))}</div>` +
+      `<p>${esc(it.sentence)}</p></div>`;
+    const shown = E.up.concat(E.down.slice(0, 2));
+    const driverTable = shown.length
+      ? `<div class="drivers">${shown.map(driverCard).join('')}</div>`
+      : '<p class="muted">No sensor moved the score meaningfully; all six effects are small.</p>';
+
+    const stepIcon = {caution: 'Verify first', area: 'Possible area to investigate', action: 'Recommended action'};
+    const steps = `<ol class="steps">${E.steps.map((s) => `<li class="${s.kind}"><span class="kind">${stepIcon[s.kind]}</span>${esc(s.text)}</li>`).join('')}</ol>`;
+
     $('result').innerHTML =
-      `<h2>Result</h2>` +
+      // A. Assessment
+      `<section class="panel" aria-labelledby="ra"><h2 id="ra">A. Maintenance assessment</h2>` + warn +
       `<div class="risk"><span class="num">${pct(p, 1)}</span><span class="pill ${level}">${esc(label)}</span></div>` +
-      `<p class="muted">Predicted probability of the dataset's <em>Needs Maintenance</em> label.</p>` +
+      `<p class="muted">Predicted probability of the dataset's <em>Needs Maintenance</em> label · inspection threshold <strong>${pct(thr, 0)}</strong></p>` +
       `<div class="bar" role="img" aria-label="Risk ${pct(p, 1)}, threshold ${pct(thr, 0)}"><div class="mark" style="left:${thr * 100}%"></div><div class="dot" style="left:${Math.min(Math.max(p, 0.01), 0.99) * 100}%"></div></div>` +
       `<div class="bar-labels"><span>0%</span><span>Threshold ${pct(thr, 0)}</span><span>100%</span></div>` +
-      `<p>This engine scores higher than <strong>${pctile.toFixed(0)}%</strong> of development engines. At threshold ${f2(thr)}, the engines flagged in development data carried the label ${pct(c.precision)} of the time (${pct(oof.prevalence)} by chance), and flagging at this threshold finds ${pct(c.recall)} of all labelled cases.</p>` +
-      `<div class="next"><strong>Next action (human-reviewed).</strong> ${esc(action)}</div>` +
-      (warnings.length ? `<div class="errors warn"><strong>Input warnings</strong><ul>${warnings.map((w) => `<li>${esc(w)}</li>`).join('')}</ul></div>` : '') +
-      `<h3>Why this score (this engine only)</h3>` +
-      `<p class="hint">Effect of each reading on this engine's log-odds, compared with the average development engine. Red pushes risk up, blue pushes it down. Effects add up exactly: log-odds = ${f2(intercept)} (base) + the six bars. These are patterns in the model, not proven causes.</p>` +
-      `<div id="chart-local"></div>`;
+      `<div class="kv"><div><span>Inspection priority</span><strong>${esc(E.priority)}</strong></div>` +
+      `<div><span>Compared with development engines</span><strong>higher than ${pctile.toFixed(0)}%</strong></div>` +
+      `<div><span>At this threshold (development data)</span><strong>${pct(c.precision)} of flagged engines carried the label (${pct(oof.prevalence)} by chance); ${pct(c.recall)} of all cases found</strong></div></div>` +
+      `<div class="next"><strong>Recommended action.</strong> ${esc(E.actions[0])} ${E.level === 'hi' ? 'A person decides what to inspect and repair.' : ''}</div></section>` +
+      // B. Why flagged
+      `<section class="panel" aria-labelledby="rb"><h2 id="rb">B. ${E.level === 'hi' ? 'Why this engine was flagged' : 'Why this engine received this score'}</h2>` +
+      `<p class="tag-line"><span class="tag n">Model explanation</span></p>` +
+      E.narrative.map((l) => `<p>${esc(l)}</p>`).join('') + driverTable +
+      `<p class="hint">Odds multipliers are relative to the average development engine, so 1.30× means the odds of the label are 30% higher, not that the probability rises by 30 percentage points. The model's baseline is ${pct(E.baseline, 0)}.</p></section>` +
+      // C + D
+      `<div class="two"><section class="panel" aria-labelledby="rc"><h2 id="rc">C. Sensor contribution chart</h2>` +
+      `<p class="hint">Effect of each reading on this engine's log-odds versus the average development engine. <span style="color:#c2410c">Orange bars raise the score</span>, <span style="color:#1f4fd8">blue bars lower it</span>. Log-odds = ${f2(model.intercept)} (baseline) + the six bars, exactly.</p><div id="chart-local"></div></section>` +
+      `<section class="panel" aria-labelledby="rd"><h2 id="rd">D. Recommended next steps</h2>` +
+      `<p class="hint">In order of priority. These are areas to check, not a diagnosis.</p>${steps}` +
+      `<div class="next">Human review is required before any repair decision.</div></section></div>` +
+      // E. Limitations
+      `<section class="panel" aria-labelledby="re"><h2 id="re">E. Model limitations</h2><ul>` +
+      `<li>This is a predictive classification model, not a fault-diagnosis system. It cannot say <em>what</em> is wrong, only how engines like this one were labeled in the dataset.</li>` +
+      `<li><strong>Confirmed diagnosis:</strong> not available. The dataset has no fault descriptions, and its label definition is unknown.</li>` +
+      `<li>Manufacturer safety specifications are not included in the dataset. Compare readings with the specifications for your engine.</li>` +
+      `<li>Human verification is required: sensor errors, unusual operating conditions, and readings outside the training range can all mislead the model.</li></ul></section>`;
     barChart($('chart-local'), items, {diverging: true, fmt: (v) => (v >= 0 ? '+' : '') + v.toFixed(2), aria: 'Contribution of each sensor reading to this engine\'s risk'});
   }
 
@@ -278,19 +309,22 @@
       {k: `At or above threshold ${f2(thr)}`, v: above.length.toLocaleString(), s: pct(above.length / rows.length, 1) + ' of valid rows.'},
       {k: 'Recommended for inspection now', v: inspect.length.toLocaleString(), s: `Above threshold and within your capacity of ${cap.toLocaleString()}.`, cls: 'accent'},
       {k: `Evidence for the top ${capPct}%`, v: pct(cp.precision), s: `In development data the top ${capPct}% by risk carried the label this often (${pct(cp.randomPrecision)} by chance) and found ${pct(cp.recall)} of all cases.`}
-    ].map((x) => `<div class="card ${x.cls || ''}"><div class="k">${esc(x.k)}</div><div class="v">${esc(x.v)}</div><div class="s">${esc(x.s)}</div></div>`).join('');
+    ].concat(rows.some((r) => r.outOfRange.length) ? [{k: 'Rows with readings outside the training range', v: rows.filter((r) => r.outOfRange.length).length.toLocaleString(), s: 'The model extrapolates for these rows. Verify the readings; do not treat a low score as routine.', cls: 'warn'}] : []).map((x) => `<div class="card ${x.cls || ''}"><div class="k">${esc(x.k)}</div><div class="v">${esc(x.v)}</div><div class="s">${esc(x.s)}</div></div>`).join('');
 
     const mode = $('filter').value;
     let shown = rows;
     if (mode === 'above') shown = above; else if (mode === 'inspect') shown = inspect;
     const LIMIT = 200;
-    const head = `<thead><tr><th>Rank</th><th>CSV row</th>${F.map((f, i) => `<th>${esc(f)}<br><small>${esc(U[i])}</small></th>`).join('')}<th>Risk</th><th class="l">Status</th></tr></thead>`;
+    const head = `<thead><tr><th>Rank</th><th>CSV row</th>${F.map((f, i) => `<th>${esc(f)}<br><small>${esc(U[i])}</small></th>`).join('')}<th>Risk</th><th class="l">Main model driver</th><th class="l">Status</th></tr></thead>`;
     const body = shown.slice(0, LIMIT).map((r) => {
       const isAbove = r.risk >= thr, within = r.rank <= cap;
-      const tag = isAbove && within ? '<span class="tag y">Inspect</span>' : isAbove ? '<span class="tag m">Above threshold, over capacity</span>' : '<span class="tag n">Routine</span>';
-      return `<tr class="${isAbove && within ? 'flag' : ''}"><td>${r.rank}</td><td>${r.rowNumber}</td>${r.values.map((v) => `<td>${Number(v.toFixed(2))}</td>`).join('')}<td><strong>${pct(r.risk, 1)}</strong></td><td class="l">${tag}</td></tr>`;
+      const oor = r.outOfRange.length > 0;
+      const tag = isAbove && within ? '<span class="tag y">Inspect</span>' : isAbove ? '<span class="tag m">Above threshold, over capacity</span>' : oor ? '<span class="tag m">Verify readings first</span>' : '<span class="tag n">Routine</span>';
+      const warnTag = oor && isAbove ? ' <span class="tag m" title="' + esc('Outside training range: ' + r.outOfRange.join(', ')) + '">Check readings</span>' : '';
+      const drv = r.driver ? `${esc(r.driver.name)} <small>▲ odds ${r.driver.oddsFactor > 1000 ? '>1,000' : r.driver.oddsFactor.toFixed(2)}×</small>` : '<span class="muted">Baseline risk</span>';
+      return `<tr class="${isAbove && within ? 'flag' : ''}"><td>${r.rank}</td><td>${r.rowNumber}</td>${r.values.map((v) => `<td>${Number(v.toFixed(2))}</td>`).join('')}<td><strong>${pct(r.risk, 1)}</strong></td><td class="l">${drv}</td><td class="l">${tag}${warnTag}</td></tr>`;
     }).join('');
-    $('fleet-table').innerHTML = `<caption class="sr">Engines ranked by predicted maintenance risk</caption>${head}<tbody>${body || `<tr><td colspan="${F.length + 4}" class="l">No rows match this filter.</td></tr>`}</tbody>`;
+    $('fleet-table').innerHTML = `<caption class="sr">Engines ranked by predicted maintenance risk</caption>${head}<tbody>${body || `<tr><td colspan="${F.length + 5}" class="l">No rows match this filter.</td></tr>`}</tbody>`;
     $('fleet-more').textContent = shown.length > LIMIT ? `Showing the top ${LIMIT} of ${shown.length.toLocaleString()} rows. The exported CSV contains every valid row.` : '';
     const box = $('invalid-box');
     box.hidden = fl.invalid.length === 0;

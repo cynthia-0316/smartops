@@ -167,7 +167,7 @@ test('exportCSV: round trip keeps ranks, row numbers, values and the recommendat
   const thr = res.rows[1].risk; // flag the top two
   const text = C.exportCSV(m, res.rows, thr, 1);
   const grid = C.parseCSV(text);
-  assert.deepEqual(grid[0], ['rank', 'csv_row_number', 'A', 'B', 'risk_score', 'above_threshold', 'within_capacity', 'recommended_action']);
+  assert.deepEqual(grid[0], ['rank', 'csv_row_number', 'A', 'B', 'risk_score', 'above_threshold', 'within_capacity', 'recommended_action', 'main_model_driver', 'driver_odds_multiplier', 'review_focus', 'reliability_note']);
   assert.equal(grid.length, 5);
   assert.equal(grid[1][0], '1'); assert.equal(grid[1][6], 'yes'); assert.equal(grid[1][7], 'Inspect (human review)');
   assert.equal(grid[2][5], 'yes'); assert.equal(grid[2][6], 'no'); assert.match(grid[2][7], /over capacity/);

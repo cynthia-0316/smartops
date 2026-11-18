@@ -29,6 +29,16 @@ Why not the penalised GAM (20 splines) that the report names as its recommendati
 3. `js/core.js` re-implements the spline basis, scaling and logistic function. `tests/core.test.js` checks it against the same reference rows (`npm test` in this folder, or `node --test dashboard/tests/core.test.js`). The Model Insights page repeats this check in the browser.
 4. All metrics shown (test AUC, cross-validation AUC, threshold and cost tables) are read from the exported file. Nothing is simulated or typed in by hand.
 
+## Predict page: explanations and recommendations
+
+After **Analyze Engine** the page shows five sections: A. maintenance assessment, B. why the engine was flagged, C. sensor contribution chart, D. recommended next steps, E. model limitations.
+
+- Everything is derived from the fitted model's own per-sensor contributions (`Model.contributions()`), which add up exactly to the log-odds. A sensor is described as raising risk only when its contribution is at least +0.10 log-odds (odds multiplied by about 1.1 or more).
+- Effects are shown as **odds multipliers** versus the average development engine, never as percentage-point changes. If no sensor raises the score meaningfully, the text says so and points to the model's baseline risk instead of inventing a reason.
+- Recommendations are templates keyed to the sensors the model actually flagged. They are worded as areas to verify, never as a diagnosis or a repair claim. Model explanation, possible areas to investigate, recommended action and "confirmed diagnosis: not available" are kept separate.
+- Readings outside the training range show a reliability warning, the prediction itself is unchanged, and the engine is never labeled "routine monitoring" on the strength of a low score alone.
+- Fleet Priorities adds a **Main model driver** column and the CSV export adds `main_model_driver`, `driver_odds_multiplier`, `review_focus` and `reliability_note`.
+
 ## Business views
 
 - The decision tables and the capture curve come from **out-of-fold predictions on development data**, never from the test set or in-sample fits.
@@ -48,10 +58,10 @@ Nothing has been deployed publicly. Deploying needs team approval.
 ## Tests
 
 ```bash
-node --test dashboard/tests/core.test.js
+node --test dashboard/tests/core.test.js dashboard/tests/explain.test.js
 ```
 
-Covers the spline maths (partition of unity, linear extrapolation), input validation, CSV parsing, ranking, export, threshold and cost logic. Four of the 18 tests need the real `model/model.json`: parity with scikit-learn on 322 reference rows, contributions summing to the log-odds, saved metrics vs the project report (test AUC 0.7099, CV AUC about 0.703), and decision-table consistency. Without the model file they are reported as skipped, not passed.
+Covers the spline maths (partition of unity, linear extrapolation), input validation, CSV parsing, ranking, export, threshold and cost logic. Twelve of the 33 tests need the real `model/model.json`: parity with scikit-learn on 322 reference rows, contributions summing to the log-odds, saved metrics vs the project report (test AUC 0.7099, CV AUC about 0.703), and decision-table consistency. `tests/explain.test.js` covers the explanation and recommendation logic (see below). Without the model file the model-dependent tests are reported as skipped, not passed.
 
 ## Files
 
