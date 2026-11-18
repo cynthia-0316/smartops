@@ -134,6 +134,12 @@
         values.push(NaN);
         return;
       }
+      const unit = model.a.units ? model.a.units[j] : '';
+      if (num < 0 && (unit === 'rpm' || unit === 'bar')) {
+        errors.push(f + ' cannot be negative (got ' + num + ').');
+        values.push(NaN);
+        return;
+      }
       values.push(num);
       const r = model.a.ranges[f];
       if (num < r.min || num > r.max) {

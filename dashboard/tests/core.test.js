@@ -90,6 +90,16 @@ test('validation: missing, non-numeric, and out-of-range inputs', () => {
   assert.equal(v.ok, true); assert.equal(v.warnings.length, 0);
 });
 
+test('validation: negative RPM or pressure is rejected, negative temperature is only a range warning', () => {
+  const a = tinyArtifact();
+  a.units = ['rpm', 'degC'];
+  const m = new C.Model(a);
+  let v = C.validateRow(m, {A: '-5', B: '1'});
+  assert.equal(v.ok, false); assert.match(v.errors[0], /A cannot be negative/);
+  v = C.validateRow(m, {A: '1', B: '-5'});
+  assert.equal(v.ok, true); assert.equal(v.warnings.length, 1);
+});
+
 /* ---------- Decision, capacity and cost maths ---------- */
 const tab = {thresholds: [0, 0.5, 1], tp: [60, 50, 0], fp: [40, 20, 0], fn: [0, 10, 60], tn: [0, 20, 40]}; // n = 100, 60 positives
 

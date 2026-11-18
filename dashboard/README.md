@@ -6,7 +6,7 @@ Workflow: **sensor readings or CSV -> model prediction -> interpretation -> thre
 
 ## Run it locally (no installs)
 
-You need the model files first (one-time, in Google Colab, see below). Then either:
+The exported model files are already in `dashboard/model/` (re-create them any time with `notebooks/dashboard_model_export.ipynb` in Google Colab, see below). Then either:
 
 ```bash
 node dashboard/serve.js
@@ -51,7 +51,7 @@ Nothing has been deployed publicly. Deploying needs team approval.
 node --test dashboard/tests/core.test.js
 ```
 
-Covers the spline maths (partition of unity, linear extrapolation), input validation, CSV parsing, ranking, export, threshold and cost logic. Four extra tests run automatically once the real `model/model.json` is present: parity with scikit-learn, saved metrics vs the project report (test AUC 0.7099, CV AUC about 0.703), and decision-table consistency. Without the model file they are reported as skipped, not passed.
+Covers the spline maths (partition of unity, linear extrapolation), input validation, CSV parsing, ranking, export, threshold and cost logic. Four of the 18 tests need the real `model/model.json`: parity with scikit-learn on 322 reference rows, contributions summing to the log-odds, saved metrics vs the project report (test AUC 0.7099, CV AUC about 0.703), and decision-table consistency. Without the model file they are reported as skipped, not passed.
 
 ## Files
 
