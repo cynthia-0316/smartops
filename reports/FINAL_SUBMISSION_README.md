@@ -48,4 +48,13 @@ Done locally (Windows machine with no Python; nothing was installed):
 - Wording change: the base page called the GAM the "recommended model". It now says the GAM has the best single CV score and that the dashboard deploys the spline logistic regression for transparency and lightweight browser deployment, with no superiority claim.
 - No secrets or tokens in any added file.
 
-**Not yet done (requires Colab):** the notebook has not been executed, so there is no official HTML and no fresh numbers yet. The Python in the notebook was written without a local interpreter to syntax-check it; any error will show up on the first Colab run and should be fixed before exporting. After the run, send the executed `.ipynb` or the exported HTML for cross-checking against this page.
+### Colab run (first execution, 2026-11-18)
+The notebook ran top to bottom in Colab (Python 3.13, scikit-learn 1.6.1, pandas 2.2.3, pygam 0.12.0, catboost 1.2.10) with no cell errors, and all 16 checks in Section M printed PASS:
+
+- 19,535 = 16,604 development + 2,931 test; no duplicates, no missing values; train/val/test share no feature rows; test file opened once.
+- Fresh 15-fold CV agrees with the saved runs to within 0.0002 (spline LR 0.7032, nested spline LR 0.7026, CatBoost #13 settings 0.7037, logistic regression 0.6876, Gaussian NB 0.7009, kNN 0.6970, RF 0.6988, ET 0.7010).
+- Fresh test AUC: spline LR 0.7099 (CI 0.692 to 0.729), GAM 0.7095, CatBoost #13 settings 0.7082 (saved: 0.7085). Paired bootstrap spline LR minus GAM +0.0004 (CI -0.0014 to +0.0023): no superiority claim.
+- Stored test predictions of the six finalists recompute to the saved AUCs.
+- Cost scenarios (hypothetical): at a miss cost 3x or more the cost-optimal rule flags ~everyone and saves nothing versus inspecting all.
+
+**Still to do:** run the last cell of the notebook (or rerun all after the latest push) to produce , then commit it here. The notebook was edited once after that first run (cosmetic: one stray array output removed).

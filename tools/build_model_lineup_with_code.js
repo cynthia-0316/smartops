@@ -156,7 +156,7 @@ const business = `
       <li><b>Interpretability and simple deployment beat a fraction of a percent.</b> Nine families land within about 0.002 AUC of each other, so the choice rests on other qualities. A spline logistic regression is a small set of knots and weights: a planner can inspect each sensor's curve, and the dashboard evaluates it in the browser with no server.</li>
       <li><b>Scores support inspection prioritisation. They are not diagnoses.</b> A high score means an engine resembles past engines labelled “needs maintenance”; it says nothing about which component is at fault.</li>
       <li><b>Cost-saving scenarios are hypothetical.</b> The data has no cost information. With cheap unneeded inspections the model can beat “inspect everything”; once a missed fault costs about three times an unneeded inspection, the cost-optimal rule flags almost every engine (see code appendix, Section K).</li>
-      <li><b>Human review is required.</b> About a third of flagged engines are false alarms at any reasonable threshold, and AUC near 0.71 is a ranking aid, not a verdict.</li>
+      <li><b>Human review is required.</b> Roughly 20 to 30 percent of flagged engines are false alarms at the thresholds we examined (precision about 0.70 to 0.78 at thresholds 0.50 to 0.65), and an AUC near 0.71 is a ranking aid, not a verdict.</li>
       <li><b>Provenance is uncertain.</b> We do not know where the data came from, whether it is real or synthetic, or exactly how “needs maintenance” was defined, and there is no time or engine identifier. Treat every number here as a property of this dataset.</li>
     </ul>
   </div>
