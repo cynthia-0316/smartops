@@ -329,7 +329,7 @@
       const oor = r.outOfRange && r.outOfRange.length ? 'Outside training range: ' + r.outOfRange.join('; ') : '';
       lines.push([r.rank, r.rowNumber].concat(r.values, [
         r.risk.toFixed(6), above ? 'yes' : 'no', within ? 'yes' : 'no', fleetAction(r, threshold, capacity),
-        d ? d.name : 'None (baseline risk)', d ? (d.oddsFactor > 1000 ? '>1000' : d.oddsFactor.toFixed(2)) : '', reviewFocus(d), oor
+        d ? d.name : 'None (no single sensor driver)', d ? (d.oddsFactor > 1000 ? '>1000' : d.oddsFactor.toFixed(2)) : '', reviewFocus(d), oor
       ]).map(csvEscape).join(','));
     });
     return lines.join('\n') + '\n';
@@ -418,7 +418,11 @@
     const contribs = model.contributions(values);
     const logit = model.intercept + contribs.reduce(function (s, v) { return s + v; }, 0);
     const p = sigmoid(logit);
-    const baseP = sigmoid(model.intercept);
+    // Reference probability = logistic(intercept): the model's prediction when every sensor effect is at its
+    // development-data average (centred contribution 0). It is NOT the observed share of labelled engines.
+    const refP = sigmoid(model.intercept);
+    const prev = model.a.metrics && typeof model.a.metrics.dev_prevalence === 'number' ? model.a.metrics.dev_prevalence : null;
+    const referenceNote = 'The model’s reference probability is ' + pctText(refP, 0) + '. It is what the model predicts when every sensor’s effect sits at its average in the development data, so it is the starting point to which the sensor effects are added. It is a modeling reference, not the observed share of development engines that carry the label' + (prev === null ? '' : ' (' + pctText(prev, 0) + ')') + ', and not the risk of an actual "average" engine.';
     const totalAbs = contribs.reduce(function (s, v) { return s + Math.abs(v); }, 0);
 
     const items = F.map(function (f, j) {
@@ -456,7 +460,7 @@
     const oorNames = outOfRange.map(function (i) { return i.name; });
 
     let priority;
-    if (above) priority = reliable ? 'High priority: inspect' : 'High priority: inspect (verify readings first)';
+    if (above) priority = reliable ? 'Inspection recommended — above selected threshold' : 'Inspection recommended — above selected threshold (verify readings first)';
     else if (!reliable) priority = 'Verify readings before routine monitoring';
     else if (near) priority = 'Watch list';
     else priority = 'Routine monitoring';
@@ -467,10 +471,10 @@
     lines.push('The model estimates a ' + pctText(p, 1) + ' probability of the Needs Maintenance label for this engine. That is ' + rel + ' your ' + pctText(threshold, 0) + ' inspection threshold, so ' +
       (above ? 'the engine is flagged for inspection.' : near ? 'it is not flagged, but it is close enough to watch.' : 'it is not flagged.'));
     if (up.length) {
-      lines.push('Compared with the average development engine, ' + (up.length === 1 ? 'one reading raises the score meaningfully: ' : 'these readings raise the score the most: ') + up.map(function (i) { return i.name; }).join(', ') + '. These are sensor-by-sensor patterns the model learned from this dataset, not proven physical causes.');
+      lines.push('Measured against each sensor’s average effect in the development data, ' + (up.length === 1 ? 'one reading raises the score meaningfully: ' : 'these readings raise the score the most: ') + up.map(function (i) { return i.name; }).join(', ') + '. These are sensor-by-sensor patterns the model learned from this dataset, not proven physical causes.');
     } else {
-      lines.push('No single sensor raises this engine’s score meaningfully (each effect is smaller than a ' + MEANINGFUL.toFixed(2) + ' log-odds change, about 10% on the odds). The model starts from a baseline risk of ' + pctText(baseP, 0) + ' (the Needs Maintenance label is common in the training data) and ' + (down.length ? 'the readings listed below move the score down from there.' : 'the readings leave the score close to that baseline.') +
-        (above && baseP >= threshold ? ' The baseline alone is above your current threshold, so the threshold you choose matters more here than any individual reading.' : ''));
+      lines.push('No single sensor raises this engine’s score meaningfully (each effect is smaller than a ' + MEANINGFUL.toFixed(2) + ' log-odds change, about 10% on the odds). The model’s reference probability is ' + pctText(refP, 0) + ' (its starting point when every sensor effect is average' + (prev === null ? '' : '; the observed share of development engines with the label is ' + pctText(prev, 0)) + '), and ' + (down.length ? 'the readings listed below move the score down from there.' : 'the readings leave the score close to that reference.') +
+        (above && refP >= threshold ? ' The reference level alone is above your current threshold, so the threshold you choose matters more here than any individual reading.' : ''));
     }
     if (down.length) lines.push('These readings pull the score down: ' + down.map(function (i) { return i.name; }).join(', ') + '.');
     if (!reliable) lines.push('Reliability warning: ' + oorNames.join(', ') + (oorNames.length === 1 ? ' is' : ' are') + ' outside the range seen in training, so the model is extrapolating and the score may not be dependable.');
@@ -482,7 +486,7 @@
     const caution = reliable ? null :
       'Verify the ' + oorNames.join(', ') + ' reading' + (oorNames.length === 1 ? '' : 's') + ' first. The value is outside the training data, so the model is extrapolating. Request human review before relying on this score' + (above ? '' : ', and do not treat a low score as a reason for routine monitoring') + '.';
     let actions;
-    if (above) actions = ['Prioritize this engine in the inspection queue.', 'Request an inspection by a qualified technician. The model score is a ranking aid, not a diagnosis.', 'Record the score, threshold and readings used for this decision.'];
+    if (above) actions = ['Add this engine to the inspection queue. If inspection capacity is limited, use Fleet Priorities to rank it against other engines by risk score.', 'Request an inspection by a qualified technician. The model score is a ranking aid, not a diagnosis.', 'Record the score, threshold and readings used for this decision.'];
     else if (near) actions = ['Keep the engine on a watch list and re-check the readings at the next opportunity.', 'If inspection capacity is available, include it with the higher-risk engines.'];
     else if (reliable) actions = ['Continue routine monitoring and normal safety procedures.', 'A low score is not a guarantee. Keep acting on alarms, operator reports and scheduled inspections.'];
     else actions = ['Keep normal safety procedures in place until the readings have been verified.'];
@@ -494,7 +498,7 @@
     actions.forEach(function (a) { steps.push({kind: 'action', text: a}); });
 
     return {
-      p: p, logit: logit, baseline: baseP, level: level, priority: priority, threshold: threshold,
+      p: p, logit: logit, referenceProbability: refP, observedPrevalence: prev, referenceNote: referenceNote, level: level, priority: priority, threshold: threshold,
       items: items, up: up, down: down, outOfRange: outOfRange, reliable: reliable,
       narrative: lines, areas: areas, actions: actions, caution: caution, steps: steps
     };

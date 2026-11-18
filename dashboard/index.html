@@ -173,7 +173,7 @@
     <div class="panel">
       <h2>Local vs global explanations</h2>
       <p><strong>Global</strong> (this page) summarizes how the model behaves across all engines.</p>
-      <p><strong>Local</strong> (Predict page) shows how each sensor reading moved <em>one</em> engine's score relative to the average development engine. Because the model is additive, those effects add up exactly to the final log-odds, so no approximation (such as SHAP) is needed.</p>
+      <p><strong>Local</strong> (Predict page) shows how each sensor reading moved <em>one</em> engine's score relative to that sensor's average effect in the development data. Because the model is additive, those effects add up exactly to the final log-odds, so no approximation (such as SHAP) is needed.</p>
       <h3>Self-check</h3>
       <p class="hint">The dashboard re-computes reference predictions in your browser and compares them with the values scikit-learn produced when the model was exported.</p>
       <div id="selfcheck"></div>

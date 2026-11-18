@@ -37,7 +37,7 @@ test('explanation is built from the actual model contributions and adds up to th
     });
     assert.ok(Math.abs(e.logit - (m.intercept + c[0] + c[1])) < 1e-12);
     assert.ok(Math.abs(e.p - m.predict(row)) < 1e-12);
-    assert.ok(Math.abs(e.baseline - C.explainPrediction(m, row, 0.5).baseline) < 1e-12);
+    assert.ok(Math.abs(e.referenceProbability - 1 / (1 + Math.exp(-m.intercept))) < 1e-12);
   }
 });
 
@@ -57,15 +57,16 @@ test('a sensor is described as raising risk only when its contribution is meanin
   }
 });
 
-test('no meaningful driver: the explanation points to baseline risk instead of inventing a reason', () => {
+test('no meaningful driver: the explanation points to the reference probability instead of inventing a reason', () => {
   const m = new C.Model(tinyArtifact(0.01, 0.8)); // tiny coefficients: no sensor matters
   const e = C.explainPrediction(m, [1, 2], 0.5);
   assert.equal(e.up.length, 0);
   assert.equal(e.areas.length, 0);
   const text = e.narrative.join(' ');
   assert.match(text, /No single sensor raises/);
-  assert.match(text, /baseline risk of 69%/);
-  assert.match(text, /baseline alone is above your current threshold/);
+  assert.match(text, /reference probability is 69%/);
+  assert.match(text, /reference level alone is above your current threshold/);
+  assert.ok(!/baseline/i.test(text), "must not call the intercept-only probability a baseline risk");
   assert.equal(C.mainDriver(m, [1, 2]), null);
   assert.match(C.reviewFocus(null), /No single sensor driver/);
 });
@@ -75,7 +76,7 @@ test('levels and priority follow the threshold, contributions stay the same', ()
   const row = [1.2, 1.7];
   const p = m.predict(row);
   const hi = C.explainPrediction(m, row, p - 0.05), near = C.explainPrediction(m, row, p + 0.05), lo = C.explainPrediction(m, row, p + 0.3);
-  assert.equal(hi.level, 'hi'); assert.match(hi.priority, /High priority/);
+  assert.equal(hi.level, 'hi'); assert.equal(hi.priority, 'Inspection recommended — above selected threshold'); assert.ok(!/high priority/i.test(hi.priority));
   assert.equal(near.level, 'mid'); assert.equal(near.priority, 'Watch list');
   assert.equal(lo.level, 'lo'); assert.equal(lo.priority, 'Routine monitoring');
   assert.deepEqual(hi.items.map((i) => i.contribution), lo.items.map((i) => i.contribution));
@@ -236,7 +237,7 @@ test('real model: CSV export carries the main driver, review focus and reliabili
     const rn = Number(g[1]);
     const values = F.map((f) => Number(g[col(f)]));
     const d = C.mainDriver(m, values);
-    assert.equal(g[col('main_model_driver')], d ? d.name : 'None (baseline risk)');
+    assert.equal(g[col('main_model_driver')], d ? d.name : 'None (no single sensor driver)');
     assert.equal(g[col('review_focus')], C.reviewFocus(d));
     assert.ok(!FORBIDDEN.test(g.join(' ')));
     const oor = C.outsideTraining(m, values);
@@ -245,5 +246,86 @@ test('real model: CSV export carries the main driver, review focus and reliabili
     assert.ok(rn >= 2);
   });
   assert.ok(out.slice(1).some((g) => g[col('reliability_note')] !== ''), 'out-of-range rows should be noted');
-  assert.ok(out.slice(1).some((g) => g[col('main_model_driver')] !== 'None (baseline risk)'));
+  assert.ok(out.slice(1).some((g) => g[col('main_model_driver')] !== 'None (no single sensor driver)'));
+});
+
+/* ---------- Reference probability vs observed prevalence; no objective "High priority" label ---------- */
+const sig = (z) => 1 / (1 + Math.exp(-z));
+
+test('reference probability is the intercept-only probability and is explained as such, not as observed average risk', () => {
+  const a = tinyArtifact(3, 0.8);
+  a.metrics = {dev_prevalence: 0.5};
+  const m = new C.Model(a);
+  const e = C.explainPrediction(m, [1, 1.5], 0.5);
+  assert.ok(Math.abs(e.referenceProbability - sig(0.8)) < 1e-12);
+  assert.equal(e.observedPrevalence, 0.5);
+  assert.match(e.referenceNote, /reference probability is 69%/);
+  assert.match(e.referenceNote, /every sensor.s effect sits at its average in the development data/);
+  assert.match(e.referenceNote, /not the observed share of development engines that carry the label \(50%\)/);
+  assert.match(e.referenceNote, /not the risk of an actual "average" engine/);
+  // without a stored prevalence the note must not invent one
+  const noPrev = C.explainPrediction(new C.Model(tinyArtifact(3, 0.8)), [1, 1.5], 0.5);
+  assert.equal(noPrev.observedPrevalence, null);
+  assert.ok(!/\d+%\)/.test(noPrev.referenceNote));
+});
+
+test('real model: reference 65% and observed prevalence 63% are reported as different quantities', {skip}, () => {
+  const m = new C.Model(real);
+  const e = C.explainPrediction(m, real.reference.X[0], 0.5);
+  assert.ok(Math.abs(e.referenceProbability - sig(real.logistic.intercept)) < 1e-12);
+  assert.ok(Math.abs(e.referenceProbability - 0.6532) < 0.0005);
+  assert.ok(Math.abs(e.observedPrevalence - real.metrics.dev_prevalence) < 1e-12);
+  assert.ok(Math.abs(e.observedPrevalence - 0.6305) < 0.0005);
+  assert.ok(e.referenceProbability - e.observedPrevalence > 0.01, 'they are different numbers');
+  assert.match(e.referenceNote, /65%/); assert.match(e.referenceNote, /63%/);
+  assert.match(e.referenceNote, /modeling reference, not the observed share/);
+});
+
+test('real model: wording never presents the intercept-only probability as observed or average engine risk', {skip}, () => {
+  const m = new C.Model(real);
+  const BAD = /(baseline risk|average engine|average development engine|observed average|average risk|typical engine.s risk)/i;
+  for (const row of real.reference.X) for (const thr of [0.2, 0.5, 0.65, 0.9]) {
+    const e = C.explainPrediction(m, row, thr);
+    const text = allText(e) + ' ' + e.referenceNote;
+    // The only allowed use of the phrase "average engine" is the explicit denial inside the reference note.
+    const stripped = text.replace('not the risk of an actual "average" engine', '');
+    assert.ok(!BAD.test(stripped), 'misleading baseline wording: ' + (stripped.match(BAD) || [])[0]);
+    assert.match(e.referenceNote, /reference probability is 65%/);
+  }
+});
+
+test('single-engine labels never call an engine objectively "High priority"', () => {
+  const m = new C.Model(tinyArtifact(3));
+  const allowed = new Set([
+    'Inspection recommended — above selected threshold',
+    'Inspection recommended — above selected threshold (verify readings first)',
+    'Verify readings before routine monitoring', 'Watch list', 'Routine monitoring'
+  ]);
+  for (let a = -1; a <= 5; a += 0.5) for (const thr of [0.1, 0.5, 0.9]) {
+    const e = C.explainPrediction(m, [a, 1.5], thr);
+    assert.ok(allowed.has(e.priority), 'unexpected label: ' + e.priority);
+    assert.ok(!/high[- ]priority/i.test(allText(e)));
+  }
+  assert.match(C.explainPrediction(m, [1.2, 1.7], 0.01).actions[0], /Fleet Priorities to rank it against other engines by risk score/);
+});
+
+test('the page source uses the corrected wording (no High priority, no average-engine baseline claim)', () => {
+  const dir = path.join(__dirname, '..');
+  const src = ['js/app.js', 'js/core.js', 'index.html'].map((f) => fs.readFileSync(path.join(dir, f), 'utf8')).join('\n');
+  assert.ok(!/high[- ]priority/i.test(src), 'a High priority label is still in the source');
+  assert.ok(!/average development engine/i.test(src));
+  assert.ok(!/\(baseline\) \+/i.test(src));
+  assert.ok(/Inspection recommended — above selected threshold|Inspection recommended — above selected threshold/.test(src));
+  assert.ok(/E\.referenceNote/.test(fs.readFileSync(path.join(dir, 'js/app.js'), 'utf8')));
+});
+
+test('fleet ranking still orders by risk score and applies inspection capacity', () => {
+  const m = new C.Model(tinyArtifact(3));
+  const res = C.scoreCSV(m, 'Fuel Pressure,Lub Oil Temp\n0.5,0.5\n2.5,2.5\n1.2,1.7\n2,0.2\n');
+  for (let i = 1; i < res.rows.length; i++) assert.ok(res.rows[i - 1].risk >= res.rows[i].risk);
+  const thr = 0; // everything is above the threshold; capacity decides who is inspected now
+  const grid = C.parseCSV(C.exportCSV(m, res.rows, thr, 2));
+  const col = grid[0].indexOf('recommended_action');
+  assert.equal(grid[1][col], 'Inspect (human review)'); assert.equal(grid[2][col], 'Inspect (human review)');
+  assert.match(grid[3][col], /over capacity/);
 });

@@ -149,7 +149,7 @@
       {k: 'Model', v: 'Spline logistic regression', s: 'One additive model, fitted on development data only.', cls: 'accent', small: true},
       {k: 'Validated performance (held-out test)', v: 'AUC ' + f2(t.auc), s: `95% CI ${f2(t.auc_ci[0])} to ${f2(t.auc_ci[1])} on ${t.n.toLocaleString()} engines. Cross-validation ${f2(M.cv.auc_mean)} ± ${f2(M.cv.auc_std)}.`},
       {k: `Engines flagged at threshold ${f2(state.threshold)}`, v: pct(c.flaggedShare), s: `Development data, out-of-fold: ${Math.round(c.flaggedShare * c.n).toLocaleString()} of ${c.n.toLocaleString()} engines.`},
-      {k: 'High-priority engines in your upload', v: state.fleet ? state.fleet.rows.filter((r) => r.risk >= state.threshold).length.toLocaleString() : 'None yet', s: state.fleet ? `of ${state.fleet.rows.length.toLocaleString()} valid rows above the threshold.` : 'Upload a fleet file on Fleet Priorities.'}
+      {k: 'Engines above the threshold in your upload', v: state.fleet ? state.fleet.rows.filter((r) => r.risk >= state.threshold).length.toLocaleString() : 'None yet', s: state.fleet ? `of ${state.fleet.rows.length.toLocaleString()} valid rows above the threshold.` : 'Upload a fleet file on Fleet Priorities.'}
     ];
     $('ov-cards').innerHTML = cards.map((x) => `<div class="card ${x.cls || ''}"><div class="k">${esc(x.k)}</div><div class="v" ${x.small ? 'style="font-size:21px"' : ''}>${esc(x.v)}</div><div class="s">${esc(x.s)}</div></div>`).join('');
 
@@ -207,7 +207,7 @@
     const c = C.confusionAt(oof, thrIdx());
     const pctile = C.scorePercentile(oof.score_quantiles, p);
     const level = !E.reliable && E.level !== 'hi' ? 'mid' : E.level;
-    const label = {hi: 'Above threshold: recommend inspection', mid: E.reliable ? 'Near threshold: watch closely' : 'Verify readings first', lo: 'Below threshold'}[level];
+    const label = {hi: 'Inspection recommended — above selected threshold', mid: E.reliable ? 'Near threshold: watch closely' : 'Verify readings first', lo: 'Below threshold'}[level];
     const oddsFmt = (f) => (f > 1000 ? '>1,000×' : f < 0.001 ? '<0.001×' : f.toFixed(2) + '×');
     const items = E.items.map((it) => ({label: it.name, v: it.contribution, sub: C.withUnit(it.value, it.unit)})).sort((a, b) => Math.abs(b.v) - Math.abs(a.v));
 
@@ -236,7 +236,7 @@
       `<p class="muted">Predicted probability of the dataset's <em>Needs Maintenance</em> label · inspection threshold <strong>${pct(thr, 0)}</strong></p>` +
       `<div class="bar" role="img" aria-label="Risk ${pct(p, 1)}, threshold ${pct(thr, 0)}"><div class="mark" style="left:${thr * 100}%"></div><div class="dot" style="left:${Math.min(Math.max(p, 0.01), 0.99) * 100}%"></div></div>` +
       `<div class="bar-labels"><span>0%</span><span>Threshold ${pct(thr, 0)}</span><span>100%</span></div>` +
-      `<div class="kv"><div><span>Inspection priority</span><strong>${esc(E.priority)}</strong></div>` +
+      `<div class="kv"><div><span>Recommendation</span><strong>${esc(E.priority)}</strong></div>` +
       `<div><span>Compared with development engines</span><strong>higher than ${pctile.toFixed(0)}%</strong></div>` +
       `<div><span>At this threshold (development data)</span><strong>${pct(c.precision)} of flagged engines carried the label (${pct(oof.prevalence)} by chance); ${pct(c.recall)} of all cases found</strong></div></div>` +
       `<div class="next"><strong>Recommended action.</strong> ${esc(E.actions[0])} ${E.level === 'hi' ? 'A person decides what to inspect and repair.' : ''}</div></section>` +
@@ -244,10 +244,10 @@
       `<section class="panel" aria-labelledby="rb"><h2 id="rb">B. ${E.level === 'hi' ? 'Why this engine was flagged' : 'Why this engine received this score'}</h2>` +
       `<p class="tag-line"><span class="tag n">Model explanation</span></p>` +
       E.narrative.map((l) => `<p>${esc(l)}</p>`).join('') + driverTable +
-      `<p class="hint">Odds multipliers are relative to the average development engine, so 1.30× means the odds of the label are 30% higher, not that the probability rises by 30 percentage points. The model's baseline is ${pct(E.baseline, 0)}.</p></section>` +
+      `<p class="hint">Odds multipliers are measured against each sensor's average effect in the development data, so 1.30× means the odds of the label are 30% higher, not that the probability rises by 30 percentage points. ${esc(E.referenceNote)}</p></section>` +
       // C + D
       `<div class="two"><section class="panel" aria-labelledby="rc"><h2 id="rc">C. Sensor contribution chart</h2>` +
-      `<p class="hint">Effect of each reading on this engine's log-odds versus the average development engine. <span style="color:#c2410c">Orange bars raise the score</span>, <span style="color:#1f4fd8">blue bars lower it</span>. Log-odds = ${f2(model.intercept)} (baseline) + the six bars, exactly.</p><div id="chart-local"></div></section>` +
+      `<p class="hint">Effect of each reading on this engine's log-odds, measured against each sensor's average effect in the development data. <span style="color:#c2410c">Orange bars raise the score</span>, <span style="color:#1f4fd8">blue bars lower it</span>. Log-odds = ${f2(model.intercept)} (reference level) + the six bars, exactly.</p><div id="chart-local"></div></section>` +
       `<section class="panel" aria-labelledby="rd"><h2 id="rd">D. Recommended next steps</h2>` +
       `<p class="hint">In order of priority. These are areas to check, not a diagnosis.</p>${steps}` +
       `<div class="next">Human review is required before any repair decision.</div></section></div>` +
@@ -340,7 +340,7 @@
       const oor = r.outOfRange.length > 0;
       const tag = isAbove && within ? '<span class="tag y">Inspect</span>' : isAbove ? '<span class="tag m">Above threshold, over capacity</span>' : oor ? '<span class="tag m">Verify readings first</span>' : '<span class="tag n">Routine</span>';
       const warnTag = oor && isAbove ? ' <span class="tag m" title="' + esc('Outside training range: ' + r.outOfRange.join(', ')) + '">Check readings</span>' : '';
-      const drv = r.driver ? `${esc(r.driver.name)} <small>▲ odds ${r.driver.oddsFactor > 1000 ? '>1,000' : r.driver.oddsFactor.toFixed(2)}×</small>` : '<span class="muted">Baseline risk</span>';
+      const drv = r.driver ? `${esc(r.driver.name)} <small>▲ odds ${r.driver.oddsFactor > 1000 ? '>1,000' : r.driver.oddsFactor.toFixed(2)}×</small>` : '<span class="muted">No single driver</span>';
       return `<tr class="${isAbove && within ? 'flag' : ''}"><td>${r.rank}</td><td>${r.rowNumber}</td>${r.values.map((v) => `<td>${Number(v.toFixed(2))}</td>`).join('')}<td><strong>${pct(r.risk, 1)}</strong></td><td class="l">${drv}</td><td class="l">${tag}${warnTag}</td></tr>`;
     }).join('');
     $('fleet-table').innerHTML = `<caption class="sr">Engines ranked by predicted maintenance risk</caption>${head}<tbody>${body || `<tr><td colspan="${F.length + 5}" class="l">No rows match this filter.</td></tr>`}</tbody>`;
