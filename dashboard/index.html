@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SmartOps Decision Dashboard</title>
+<meta name="description" content="SmartOps: rank engines for inspection with a validated machine learning model. CIS 508 academic prototype.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231f4fd8'/%3E%3Cpath d='M6 19h5l3-9 4 14 3-9h5' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="top">
+  <div class="wrap top-in">
+    <a class="brand" href="#overview" aria-label="SmartOps home">
+      <svg viewBox="0 0 32 32" width="28" height="28" aria-hidden="true"><rect width="32" height="32" rx="7" fill="#1f4fd8"/><path d="M6 19h5l3-9 4 14 3-9h5" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>SmartOps</span>
+    </a>
+    <nav id="nav" aria-label="Main">
+      <a href="#overview" data-tab="overview">Overview</a>
+      <a href="#predict" data-tab="predict">Predict</a>
+      <a href="#fleet" data-tab="fleet">Fleet Priorities</a>
+      <a href="#insights" data-tab="insights">Model Insights</a>
+      <a href="#business" data-tab="business">Business Impact</a>
+      <a href="#responsible" data-tab="responsible">Responsible AI</a>
+    </nav>
+  </div>
+</header>
+
+<div id="banner" class="banner" hidden role="status"></div>
+
+<main id="main" class="wrap">
+
+<!-- ============ OVERVIEW ============ -->
+<section id="overview" class="tab" aria-labelledby="h-overview">
+  <div class="hero">
+    <p class="eyebrow">Predictive maintenance decision support</p>
+    <h1 id="h-overview">Decide which engines to inspect first, when you cannot inspect them all.</h1>
+    <p class="lead">Enter six sensor readings or upload a fleet file. SmartOps estimates how likely each engine is to carry the dataset's <em>Needs Maintenance</em> label and ranks them, so planners can spend limited inspection time where it counts. It supports a human decision. It does not make repair decisions.</p>
+    <div class="cta">
+      <a class="btn primary" href="#predict">Check one engine</a>
+      <a class="btn" href="#fleet">Prioritize a fleet</a>
+    </div>
+  </div>
+
+  <div class="cards" id="ov-cards" aria-live="polite"></div>
+
+  <div class="two">
+    <div class="panel">
+      <h2>How it works</h2>
+      <ol class="flow">
+        <li><strong>Input</strong><span>Six sensor readings per engine: RPM, three pressures, two temperatures.</span></li>
+        <li><strong>Model output</strong><span>A risk score between 0 and 1, from a model validated on held-out data.</span></li>
+        <li><strong>Interpretation</strong><span>How the score compares with the development fleet and which sensors push it up or down.</span></li>
+        <li><strong>Decision</strong><span>Compare the score with a threshold you set. Above it, an engine is recommended for human inspection.</span></li>
+        <li><strong>Action</strong><span>Export a ranked inspection list and hand it to the workshop.</span></li>
+      </ol>
+    </div>
+    <div class="panel" id="ov-reco">
+      <h2>Recommendation summary</h2>
+      <div id="ov-reco-body"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PREDICT ============ -->
+<section id="predict" class="tab" aria-labelledby="h-predict" hidden>
+  <h1 id="h-predict">Single engine check</h1>
+  <p class="lead">Enter the six readings. The model returns the predicted probability of the <em>Needs Maintenance</em> label and compares it with your inspection threshold.</p>
+  <div class="two wide-left">
+    <form id="form" class="panel" novalidate>
+      <h2>Sensor readings</h2>
+      <div id="fields" class="fields"></div>
+      <div class="field">
+        <label for="thr-pred">Inspection threshold <output id="thr-pred-out"></output></label>
+        <input id="thr-pred" type="range" min="0.05" max="0.95" step="0.01">
+        <span class="hint">Risk categories depend on this configurable business threshold. They are not engineering safety limits.</span>
+      </div>
+      <div class="row">
+        <button type="submit" class="btn primary">Analyze Engine</button>
+        <button type="button" id="btn-example" class="btn">Load example engine</button>
+        <button type="reset" class="btn ghost" id="btn-clear">Clear</button>
+      </div>
+      <p class="hint" id="example-note"></p>
+      <div id="form-errors" class="errors" role="alert" hidden></div>
+    </form>
+
+    <div class="panel" id="result" aria-live="polite">
+      <h2>Result</h2>
+      <p class="muted">Enter readings and press <strong>Analyze Engine</strong>.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FLEET ============ -->
+<section id="fleet" class="tab" aria-labelledby="h-fleet" hidden>
+  <h1 id="h-fleet">Fleet inspection priorities</h1>
+  <p class="lead">Upload a CSV with the six sensor columns. Every valid row is scored with the same model, ranked by risk, and can be exported as an inspection list.</p>
+  <div class="two wide-left">
+    <div class="panel">
+      <h2>1. Upload</h2>
+      <label class="file" for="csv">
+        <span>Choose a CSV file</span>
+        <input id="csv" type="file" accept=".csv,text/csv,text/plain">
+      </label>
+      <p class="hint">Required columns (any order, extra columns ignored): <code id="req-cols"></code></p>
+      <button class="btn" id="btn-sample" type="button">Download a sample CSV</button>
+      <p class="hint" id="sample-note"></p>
+      <div id="fleet-msg" class="errors" role="alert" hidden></div>
+    </div>
+    <div class="panel">
+      <h2>2. Decide how many to inspect</h2>
+      <div class="field">
+        <label for="cap">Engines your team can inspect now</label>
+        <input id="cap" type="number" min="1" step="1" inputmode="numeric" disabled>
+        <span class="hint" id="cap-hint">Upload a file first.</span>
+      </div>
+      <div class="field">
+        <label for="thr-fleet">Risk threshold <output id="thr-fleet-out"></output></label>
+        <input id="thr-fleet" type="range" min="0.05" max="0.95" step="0.01">
+        <span class="hint">Engines at or above the threshold are flagged. This is a business choice, not an engineering safety limit.</span>
+      </div>
+      <div class="field">
+        <label for="filter">Show</label>
+        <select id="filter">
+          <option value="inspect">Recommended for inspection (above threshold and within capacity)</option>
+          <option value="above">All above threshold</option>
+          <option value="all">All valid rows</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div id="fleet-out" hidden>
+    <div class="cards" id="fleet-cards" aria-live="polite"></div>
+    <div class="panel">
+      <div class="row between">
+        <h2>3. Ranked list</h2>
+        <button class="btn primary" id="btn-export" type="button">Export ranked inspection list (CSV)</button>
+      </div>
+      <p class="hint">Rows are identified by their <strong>CSV row number</strong> (the header is row 1). The uploaded file had no engine IDs that SmartOps could rely on, so none are invented.</p>
+      <div class="table-wrap"><table id="fleet-table"><caption class="sr">Engines ranked by predicted maintenance risk</caption></table></div>
+      <p class="hint" id="fleet-more"></p>
+      <details id="invalid-box" hidden><summary id="invalid-sum"></summary><ul id="invalid-list"></ul></details>
+    </div>
+  </div>
+</section>
+
+<!-- ============ INSIGHTS ============ -->
+<section id="insights" class="tab" aria-labelledby="h-insights" hidden>
+  <h1 id="h-insights">Model insights</h1>
+  <p class="lead">The model is <strong>additive</strong>: each sensor adds or subtracts risk independently, and the six effects are summed. That makes it possible to show exactly how every sensor moves the score. These patterns describe the model and this dataset. They are <strong>not proven physical causes</strong> of engine failure.</p>
+  <div class="two">
+    <div class="panel">
+      <h2>Global: which sensors matter most</h2>
+      <p class="hint">Average size of each sensor's effect on the log-odds across the 16,604 development engines (larger = the score reacts more to that sensor). This describes the model overall, not any one engine.</p>
+      <div id="chart-importance"></div>
+    </div>
+    <div class="panel">
+      <h2>Global: response curve</h2>
+      <div class="field inline">
+        <label for="curve-sensor">Sensor</label>
+        <select id="curve-sensor"></select>
+      </div>
+      <div id="chart-curve"></div>
+      <p class="hint" id="curve-note"></p>
+    </div>
+  </div>
+  <div class="two">
+    <div class="panel">
+      <h2>Are the probabilities trustworthy?</h2>
+      <p class="hint">Development engines grouped by predicted risk (out-of-fold). If the model is well calibrated, the observed share of <em>Needs Maintenance</em> labels matches the predicted share.</p>
+      <div id="chart-cal"></div>
+    </div>
+    <div class="panel">
+      <h2>Local vs global explanations</h2>
+      <p><strong>Global</strong> (this page) summarizes how the model behaves across all engines.</p>
+      <p><strong>Local</strong> (Predict page) shows how each sensor reading moved <em>one</em> engine's score relative to the average development engine. Because the model is additive, those effects add up exactly to the final log-odds, so no approximation (such as SHAP) is needed.</p>
+      <h3>Self-check</h3>
+      <p class="hint">The dashboard re-computes reference predictions in your browser and compares them with the values scikit-learn produced when the model was exported.</p>
+      <div id="selfcheck"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ BUSINESS ============ -->
+<section id="business" class="tab" aria-labelledby="h-business" hidden>
+  <h1 id="h-business">Business impact and cost trade-offs</h1>
+  <p class="lead">Costs are <strong>assumptions you set</strong>: the dataset has no real inspection or failure costs. Results come from out-of-fold predictions on the development data, so any savings shown are hypothetical.</p>
+  <div class="two wide-left">
+    <div class="panel">
+      <h2>Assumptions</h2>
+      <div class="field">
+        <label for="unit">Cost of one unnecessary inspection (USD, hypothetical)</label>
+        <input id="unit" type="number" min="0" step="10" inputmode="decimal">
+      </div>
+      <div class="field">
+        <label for="ratio">A missed case costs this many times more <output id="ratio-out"></output></label>
+        <input id="ratio" type="range" min="0.5" max="10" step="0.5">
+        <span class="hint">1 = a missed case costs the same as an unnecessary inspection.</span>
+      </div>
+      <div class="field">
+        <label for="thr-biz">Decision threshold <output id="thr-biz-out"></output></label>
+        <input id="thr-biz" type="range" min="0.05" max="0.95" step="0.01">
+      </div>
+      <div class="field">
+        <label for="cap-pct">Inspection capacity (share of engines) <output id="cap-pct-out"></output></label>
+        <input id="cap-pct" type="range" min="1" max="100" step="1">
+      </div>
+      <button class="btn" id="btn-opt" type="button">Use cost-optimal threshold</button>
+    </div>
+    <div class="panel" id="biz-summary" aria-live="polite"></div>
+  </div>
+  <div class="two">
+    <div class="panel">
+      <h2>Expected cost per engine by threshold</h2>
+      <div id="chart-cost"></div>
+    </div>
+    <div class="panel">
+      <h2>Inspecting only the highest-risk engines</h2>
+      <p class="hint">Share of all <em>Needs Maintenance</em> cases found when only the top X% of engines (by risk score) are inspected. Dashed line: picking engines at random.</p>
+      <div id="chart-capture"></div>
+      <p id="capture-note"></p>
+    </div>
+  </div>
+  <div class="panel">
+    <h2>Strategy comparison</h2>
+    <div class="table-wrap"><table id="strat-table"><caption class="sr">Cost of each inspection strategy</caption></table></div>
+    <p class="hint">Cost units: one unnecessary inspection = 1 unit. Dollar values use your assumed unit cost and are hypothetical.</p>
+  </div>
+</section>
+
+<!-- ============ RESPONSIBLE ============ -->
+<section id="responsible" class="tab" aria-labelledby="h-responsible" hidden>
+  <h1 id="h-responsible">Responsible AI</h1>
+  <p class="lead">SmartOps is an <strong>inspection-prioritization aid</strong>, not an autonomous industrial safety system. A person must decide what to inspect and what to repair.</p>
+  <div class="grid3">
+    <article class="panel"><h2>Model limitations</h2>
+      <ul>
+        <li>Signal is modest: held-out test ROC AUC is <span id="r-auc">…</span>, so given one engine with the label and one without, the model scores the labelled one higher about <span id="r-auc-pct">…</span> of the time.</li>
+        <li>Many different model types reach the same score, which suggests the limit is the information in the six sensors, not the algorithm.</li>
+        <li>No time or engine identifier: trends, remaining life, and per-engine history are not modelled.</li>
+        <li>The label is binary and cannot explain <em>why</em> an engine needs maintenance.</li>
+      </ul></article>
+    <article class="panel"><h2>Data provenance</h2>
+      <ul>
+        <li>Public Hugging Face dataset, MIT license per its card. The card gives no original source.</li>
+        <li>It is unknown whether the data are real or synthetic, how they were collected, and <strong>how the label was assigned</strong>.</li>
+        <li>Results show the method works on this dataset. They are <strong>not</strong> real-world validation on a fleet.</li>
+        <li>If rows from one engine appear in both training and test data, every score could be optimistic. This cannot be checked without engine IDs.</li>
+      </ul></article>
+    <article class="panel"><h2>Risk of false negatives</h2>
+      <ul>
+        <li>A missed case (false negative) can mean an engine that needed attention was not inspected. Lowering the threshold catches more, at the price of more unnecessary inspections.</li>
+        <li>Engines below the threshold are <em>not</em> certified healthy. Keep routine inspection schedules.</li>
+        <li>Never use a low score to override an alarm, a driver report, or a safety procedure.</li>
+      </ul></article>
+    <article class="panel"><h2>Human oversight</h2>
+      <ul>
+        <li>The output is a ranked list for a planner. The planner decides what to inspect.</li>
+        <li>Require human review before any maintenance work order, and for every engine with an out-of-range input warning.</li>
+        <li>Record the threshold and capacity used for each decision so the choice can be audited.</li>
+      </ul></article>
+    <article class="panel"><h2>Sensor errors and distribution shift</h2>
+      <ul>
+        <li>Faulty sensors produce misleading scores. Inputs outside the training range trigger a warning, and the model only extrapolates linearly there.</li>
+        <li>Other engine types, operating conditions, or sensor calibrations can shift the data. Re-validate before using the model on a new fleet.</li>
+        <li>Thresholds here are business settings. They are not engineering safety boundaries.</li>
+      </ul></article>
+    <article class="panel"><h2>Privacy and security</h2>
+      <ul>
+        <li>The dataset has no personal or engine identifiers. Uploaded files are processed <strong>in your browser</strong> and are not sent to a server by this dashboard.</li>
+        <li>Uploads can still contain sensitive fleet data. Remove identifiers you do not need and follow your organization's data rules.</li>
+        <li>No credentials or tokens are stored in this application.</li>
+      </ul></article>
+  </div>
+  <div class="panel">
+    <h2>Suggested monitoring after deployment</h2>
+    <ul class="cols">
+      <li>Compare predicted risk with confirmed maintenance findings each month (calibration drift).</li>
+      <li>Track precision and recall of flagged engines against the capacity used.</li>
+      <li>Track the distribution of each sensor against the training ranges shown on Model Insights.</li>
+      <li>Review false negatives individually and retrain only through the development-data protocol, keeping a held-out test set.</li>
+      <li>Replace the assumed costs with real inspection and failure costs before relying on any savings figure.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <p><strong>SmartOps</strong> · CIS 508 Machine Learning in Business · Arizona State University · academic prototype. Not validated on a real fleet. See Responsible AI.</p>
+    <p id="foot-model" class="muted"></p>
+  </div>
+</footer>
+
+<script src="model/model_data.js"></script>
+<script src="js/core.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

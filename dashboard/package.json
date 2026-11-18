@@ -1,0 +1,11 @@
+{
+  "name": "smartops-dashboard",
+  "private": true,
+  "version": "1.0.0",
+  "description": "SmartOps predictive maintenance decision dashboard (static site, in-browser inference)",
+  "scripts": {
+    "start": "node serve.js 8080",
+    "test": "node --test tests/core.test.js"
+  },
+  "engines": { "node": ">=18" }
+}
