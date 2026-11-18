@@ -96,22 +96,41 @@
   function barChart(el, items, o) {
     const W = 480, rowH = 36, L = 128, R = 56, T = 8;
     const H = T + items.length * rowH + 8;
-    const mx = Math.max(...items.map((i) => Math.abs(i.v))) || 1;
     const diverging = o.diverging;
-    const zero = diverging ? L + (W - L - R) / 2 : L;
-    const scale = (diverging ? (W - L - R) / 2 : W - L - R) / mx;
+    const mags = items.map((i) => Math.abs(i.v)).sort((a, b) => b - a);
+    // One extreme value (for example an extrapolated, out-of-range sensor) must not squash the other bars:
+    // shorten that bar and say so. The printed number is always the true value.
+    const cap = diverging && mags.length > 1 && mags[0] > 4 * Math.max(mags[1], 0.25) ? 4 * Math.max(mags[1], 0.25) : null;
+    const mx = (cap || mags[0]) || 1;
+    const half = (W - L - R) / 2;
+    const zero = diverging ? L + half : L;
+    const scale = (diverging ? half : W - L - R) / mx;
     let g = diverging ? `<line x1="${zero}" x2="${zero}" y1="${T}" y2="${H - 8}" stroke="#9aa6bd"/>` : '';
+    let clipped = false;
     items.forEach((it, i) => {
-      const y = T + i * rowH, w = Math.abs(it.v) * scale;
+      const y = T + i * rowH;
+      const isClipped = cap !== null && Math.abs(it.v) > cap;
+      if (isClipped) clipped = true;
+      const w = Math.min(Math.abs(it.v), cap || Infinity) * scale;
       const x = it.v >= 0 ? zero : zero - w;
       const color = diverging ? (it.v >= 0 ? '#c2410c' : '#1f4fd8') : '#1f4fd8';
-      g += `<text x="${L - 10}" y="${y + 20}" text-anchor="end" class="ttl">${esc(it.label)}</text>`;
+      g += `<text x="${L - 10}" y="${y + 17}" text-anchor="end" class="ttl">${esc(it.label)}</text>`;
       g += `<rect x="${x}" y="${y + 6}" width="${Math.max(w, 1)}" height="20" rx="4" fill="${color}"/>`;
-      const tx = it.v >= 0 ? zero + w + 6 : zero - w - 6;
-      g += `<text x="${tx}" y="${y + 21}" text-anchor="${it.v >= 0 ? 'start' : 'end'}">${esc(o.fmt(it.v))}</text>`;
-      if (it.sub) g += `<text x="${L - 10}" y="${y + 33}" text-anchor="end" style="font-size:10.5px">${esc(it.sub)}</text>`;
+      if (isClipped) { // break marks at the shortened end
+        const bx = it.v >= 0 ? x + w - 10 : x + 10;
+        g += `<path d="M${bx - 3} ${y + 26} l6 -20 M${bx + 3} ${y + 26} l6 -20" stroke="#fff" stroke-width="2.5" fill="none"/>`;
+      }
+      const text = o.fmt(it.v);
+      const roomOutside = it.v >= 0 ? W - (zero + w + 6) : zero - w - 6 - L;
+      const needed = text.length * 6.6 + 4;
+      let tx, anchor, fill = '';
+      if (roomOutside >= needed) { tx = it.v >= 0 ? zero + w + 6 : zero - w - 6; anchor = it.v >= 0 ? 'start' : 'end'; }
+      else { const pad = isClipped ? 26 : 6; tx = it.v >= 0 ? zero + w - pad : zero - w + pad; anchor = it.v >= 0 ? 'end' : 'start'; fill = ' style="fill:#fff;font-weight:600"'; }
+      g += `<text x="${tx}" y="${y + 21}" text-anchor="${anchor}"${fill}>${esc(text)}</text>`;
+      if (it.sub) g += `<text x="${L - 10}" y="${y + 31}" text-anchor="end" style="font-size:10.5px">${esc(it.sub)}</text>`;
     });
-    el.innerHTML = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(o.aria)}">${g}</svg>`;
+    el.innerHTML = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(o.aria)}">${g}</svg>` +
+      (clipped ? '<p class="hint">One bar is drawn shortened so the other effects stay readable. The number printed on it is the true value. Very large effects usually mean a reading outside the training range.</p>' : '');
   }
 
   /* ---------- Overview ---------- */
