@@ -40,6 +40,13 @@ After **Analyze Engine** the page shows five sections: A. maintenance assessment
 - Readings outside the training range show a reliability warning, the prediction itself is unchanged, and the engine is never labeled "routine monitoring" on the strength of a low score alone.
 - Fleet Priorities adds a **Main model driver** column and the CSV export adds `main_model_driver`, `driver_odds_multiplier`, `review_focus` and `reliability_note`.
 
+## Demo helpers
+
+- **Three one-click examples** on the Predict page (above, near and below the default 0.50 threshold). They are real held-out test rows stored with the model, chosen and classified at run time by the trained model (`pickExamples` in `js/core.js`); nothing is hardcoded and the button captions show the model's own risk.
+- **At a glance** card at the top of every result: risk, the main reason, and what to do next in about 60 words. The full explanation, sensor chart, next steps and limitations are one click below.
+- **Reset demo** (top right) clears the readings and result, the uploaded fleet file, and restores the default threshold (0.50), cost assumptions and capacity.
+- Everything runs offline: no external fonts, scripts or network calls. The page works from `node dashboard/serve.js` (no Python), and `demo.test.js` checks there are no remote resources.
+
 ## Business views
 
 - The decision tables and the capture curve come from **out-of-fold predictions on development data**, never from the test set or in-sample fits.
@@ -59,10 +66,10 @@ Nothing has been deployed publicly. Deploying needs team approval.
 ## Tests
 
 ```bash
-node --test dashboard/tests/core.test.js dashboard/tests/explain.test.js
+node --test dashboard/tests/core.test.js dashboard/tests/explain.test.js dashboard/tests/demo.test.js
 ```
 
-Covers the spline maths (partition of unity, linear extrapolation), input validation, CSV parsing, ranking, export, threshold and cost logic. Fourteen of the 39 tests need the real `model/model.json`: parity with scikit-learn on 322 reference rows, contributions summing to the log-odds, saved metrics vs the project report (test AUC 0.7099, CV AUC about 0.703), and decision-table consistency. `tests/explain.test.js` covers the explanation and recommendation logic (see below). Without the model file the model-dependent tests are reported as skipped, not passed.
+Covers the spline maths (partition of unity, linear extrapolation), input validation, CSV parsing, ranking, export, threshold and cost logic. Eighteen of the 47 tests need the real `model/model.json`: parity with scikit-learn on 322 reference rows, contributions summing to the log-odds, saved metrics vs the project report (test AUC 0.7099, CV AUC about 0.703), and decision-table consistency. `tests/explain.test.js` covers the explanation and recommendation logic (see below). Without the model file the model-dependent tests are reported as skipped, not passed.
 
 ## Files
 

@@ -25,8 +25,10 @@
       <a href="#business" data-tab="business">Business Impact</a>
       <a href="#responsible" data-tab="responsible">Responsible AI</a>
     </nav>
+    <button id="btn-reset" class="btn ghost small" type="button" title="Clear inputs and restore default settings">Reset demo</button>
   </div>
 </header>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
 
 <div id="banner" class="banner" hidden role="status"></div>
 
@@ -76,9 +78,9 @@
       <input id="thr-pred" type="range" min="0.05" max="0.95" step="0.01">
       <span class="hint">Risk categories depend on this configurable business threshold. They are not engineering safety limits.</span>
     </div>
+    <div class="examples"><span class="ex-label">One-click examples</span><div id="examples" class="row"></div></div>
     <div class="row">
       <button type="submit" class="btn primary">Analyze Engine</button>
-      <button type="button" id="btn-example" class="btn">Load example engine</button>
       <button type="reset" class="btn ghost" id="btn-clear">Clear</button>
     </div>
     <p class="hint" id="example-note"></p>
@@ -86,7 +88,7 @@
   </form>
 
   <div id="result" aria-live="polite">
-    <div class="panel"><h2>Result</h2><p class="muted">Enter readings and press <strong>Analyze Engine</strong>. You will get the risk, why the engine was flagged, and what to check first.</p></div>
+    <div class="panel"><h2>Result</h2><p class="muted">Pick a one-click example or enter readings, then press <strong>Analyze Engine</strong>. You will get the risk, the main reason, and what to check first.</p></div>
   </div>
 </section>
 

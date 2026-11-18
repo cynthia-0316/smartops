@@ -411,6 +411,36 @@
     return 'within the typical range for development engines (' + rng + '; ' + med + ')';
   }
 
+  // hi: at or above the threshold; mid: within 0.10 below it; lo: otherwise.
+  function levelFor(p, threshold) {
+    return p >= threshold ? 'hi' : p >= threshold - 0.10 ? 'mid' : 'lo';
+  }
+
+  const TOPIC = {
+    'Engine RPM': 'RPM reading',
+    'Lub Oil Pressure': 'lubricating-oil pressure reading',
+    'Fuel Pressure': 'fuel-pressure reading',
+    'Coolant Pressure': 'coolant-pressure reading',
+    'Lub Oil Temp': 'lubricating-oil temperature reading',
+    'Coolant Temp': 'coolant-temperature reading'
+  };
+
+  // Three demo engines chosen from real rows (held-out test rows stored with the model), classified by the
+  // trained model itself at the given threshold. Only in-range rows are used. Targets are relative to the
+  // threshold: clearly above (+0.30), just below (-0.05), clearly below (-0.25).
+  function pickExamples(model, rows, threshold) {
+    const targets = {hi: threshold + 0.30, mid: threshold - 0.05, lo: threshold - 0.25};
+    const best = {hi: null, mid: null, lo: null};
+    rows.forEach(function (row, i) {
+      if (outsideTraining(model, row).length) return;
+      const p = model.predict(row);
+      const level = levelFor(p, threshold);
+      const d = Math.abs(p - targets[level]);
+      if (!best[level] || d < best[level].d) best[level] = {index: i, p: p, level: level, d: d};
+    });
+    return best;
+  }
+
   // Everything the Predict page shows about one engine, computed from the fitted model.
   function explainPrediction(model, values, threshold) {
     const F = model.features;
@@ -456,7 +486,7 @@
 
     const above = p >= threshold;
     const near = !above && p >= threshold - 0.10;
-    const level = above ? 'hi' : near ? 'mid' : 'lo';
+    const level = levelFor(p, threshold);
     const oorNames = outOfRange.map(function (i) { return i.name; });
 
     let priority;
@@ -497,7 +527,23 @@
     if (up.length || above || near) steps.push({kind: 'area', text: 'Compare the readings with the manufacturer’s specifications, which are not part of this dataset.'});
     actions.forEach(function (a) { steps.push({kind: 'action', text: a}); });
 
+    // --- two-line summary for the "at a glance" card ---
+    const relShort = function (i) { return i.outsideTraining ? 'outside the training range' : i.relation === 'above' ? 'above the typical range' : i.relation === 'below' ? 'below the typical range' : 'within the typical range'; };
+    const topic = function (n) { return TOPIC[n] || (n + ' reading'); };
+    const top2 = up.slice(0, 2);
+    let glanceReason;
+    if (!reliable) glanceReason = oorNames.join(', ') + (oorNames.length === 1 ? ' is' : ' are') + ' outside the range seen in training, so the score may not be dependable.';
+    else if (up.length) glanceReason = (level === 'hi' ? 'Main reason: ' : 'Closest concern: ') + top2.map(function (i) { return i.name + ' (' + withUnit(i.value, i.unit) + ', ' + relShort(i) + ')'; }).join(' and ') + (top2.length === 1 ? ' raises' : ' raise') + ' the score most.';
+    else if (down.length) glanceReason = 'No single sensor raises the score. ' + down.slice(0, 2).map(function (i) { return i.name; }).join(' and ') + (down.slice(0, 2).length === 1 ? ' pulls' : ' pull') + ' it down from the model’s reference level (' + pctText(refP, 0) + ').';
+    else glanceReason = 'No single sensor stands out. The score stays close to the model’s reference level (' + pctText(refP, 0) + ').';
+    let glanceNext;
+    if (!reliable) glanceNext = 'Verify the ' + oorNames.join(', ') + ' reading' + (oorNames.length === 1 ? '' : 's') + ' first, then request human review before relying on this score.';
+    else if (above) glanceNext = 'Add it to the inspection queue and ask a qualified technician to review it.' + (up.length ? ' Start by checking the ' + top2.map(function (i) { return topic(i.name); }).join(' and ') + '.' : '');
+    else if (near) glanceNext = 'Put it on the watch list and re-check the readings soon.';
+    else glanceNext = 'No extra inspection suggested. Keep routine monitoring and normal safety procedures.';
+
     return {
+      glance: {headline: priority, reason: glanceReason, next: glanceNext},
       p: p, logit: logit, referenceProbability: refP, observedPrevalence: prev, referenceNote: referenceNote, level: level, priority: priority, threshold: threshold,
       items: items, up: up, down: down, outOfRange: outOfRange, reliable: reliable,
       narrative: lines, areas: areas, actions: actions, caution: caution, steps: steps
@@ -509,7 +555,7 @@
     thresholdIndex: thresholdIndex, confusionAt: confusionAt, costFor: costFor, strategies: strategies,
     bestThreshold: bestThreshold, captureAt: captureAt, scorePercentile: scorePercentile,
     parseCSV: parseCSV, scoreCSV: scoreCSV, exportCSV: exportCSV, fleetAction: fleetAction,
-    explainPrediction: explainPrediction, mainDriver: mainDriver, reviewFocus: reviewFocus,
+    explainPrediction: explainPrediction, pickExamples: pickExamples, levelFor: levelFor, mainDriver: mainDriver, reviewFocus: reviewFocus,
     outsideTraining: outsideTraining, MEANINGFUL: MEANINGFUL, withUnit: withUnit
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

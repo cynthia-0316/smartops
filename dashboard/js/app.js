@@ -29,7 +29,7 @@
     b.className = 'banner err'; b.hidden = false;
     b.textContent = 'Model file not found. Run notebooks/dashboard_model_export.ipynb in Google Colab and copy model_data.js and model.json into dashboard/model/ (see dashboard/README.md).';
     $('ov-cards').innerHTML = '<div class="card"><div class="k">Model</div><div class="v">Not loaded</div><div class="s">No predictions are available until the trained model is exported.</div></div>';
-    document.querySelectorAll('#form button[type=submit], #btn-example, #csv, #btn-sample').forEach((e) => { e.disabled = true; });
+    document.querySelectorAll('#form button[type=submit], #csv, #btn-sample, #btn-reset').forEach((e) => { e.disabled = true; });
     return;
   }
 
@@ -38,7 +38,9 @@
   const U = art.units;
   const M = art.metrics;
   const oof = art.oof;
-  const state = {threshold: 0.5, ratio: 1, unit: 100, capPct: 10, fleet: null, capN: null, lastRow: null};
+  const DEFAULTS = {threshold: 0.5, ratio: 1, unit: 100, capPct: 10};
+  const RESULT_PLACEHOLDER = '<div class="panel"><h2>Result</h2><p class="muted">Pick a one-click example or enter readings, then press <strong>Analyze Engine</strong>. You will get the risk, the main reason, and what to check first.</p></div>';
+  const state = {threshold: DEFAULTS.threshold, ratio: DEFAULTS.ratio, unit: DEFAULTS.unit, capPct: DEFAULTS.capPct, fleet: null, capN: null, lastRow: null, detailsOpen: false};
 
   if (art.meta.fixture) {
     const b = $('banner');
@@ -173,10 +175,23 @@
         `<input id="in-${i}" name="${esc(f)}" type="number" step="any" inputmode="decimal" required aria-describedby="rng-${i}">` +
         `<span class="hint" id="rng-${i}">Training range ${r.min.toFixed(r.max < 20 ? 2 : 1)} to ${r.max.toFixed(r.max < 20 ? 2 : 1)}</span></div>`;
     }).join('');
-    const ex = art.reference.X[0];
-    $('example-note').textContent = 'The example is a real row from the held-out test set. Its label is not shown.';
-    $('btn-example').onclick = () => { ex.forEach((v, i) => { $('in-' + i).value = Number(v.toFixed(4)); $('in-' + i).removeAttribute('aria-invalid'); }); $('form-errors').hidden = true; };
-    $('btn-clear').onclick = () => { setTimeout(() => { state.lastRow = null; $('form-errors').hidden = true; $('result').innerHTML = '<div class="panel"><h2>Result</h2><p class="muted">Enter readings and press <strong>Analyze Engine</strong>.</p></div>'; }, 0); };
+    // One-click examples: real held-out test rows, classified by the trained model itself at the default threshold.
+    const realRows = art.reference.X.slice(0, art.reference.n_real_test_rows);
+    const picks = C.pickExamples(model, realRows, DEFAULTS.threshold);
+    const exDefs = [['hi', 'Above threshold'], ['mid', 'Near threshold'], ['lo', 'Below threshold']];
+    $('examples').innerHTML = exDefs.filter((d) => picks[d[0]]).map((d) =>
+      `<button type="button" class="btn ex ${d[0]}" data-ex="${d[0]}">${d[1]} <small>model says ${pct(picks[d[0]].p, 0)}</small></button>`).join('');
+    $('example-note').textContent = `Examples are real rows from the held-out test set (labels not shown), sorted by the trained model at the default ${pct(DEFAULTS.threshold, 0)} threshold. Clicking one sets that threshold.`;
+    $('examples').addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-ex]');
+      if (!b || !picks[b.dataset.ex]) return;
+      const row = realRows[picks[b.dataset.ex].index];
+      setThreshold(DEFAULTS.threshold);
+      row.forEach((v, i) => { $('in-' + i).value = Number(v.toFixed(4)); $('in-' + i).removeAttribute('aria-invalid'); });
+      $('form-errors').hidden = true;
+      $('form').requestSubmit();
+    });
+    $('btn-clear').onclick = () => { setTimeout(() => { state.lastRow = null; $('form-errors').hidden = true; $('result').innerHTML = RESULT_PLACEHOLDER; }, 0); };
     $('form').addEventListener('submit', (e) => {
       e.preventDefault();
       const raw = {};
@@ -207,7 +222,7 @@
     const c = C.confusionAt(oof, thrIdx());
     const pctile = C.scorePercentile(oof.score_quantiles, p);
     const level = !E.reliable && E.level !== 'hi' ? 'mid' : E.level;
-    const label = {hi: 'Inspection recommended — above selected threshold', mid: E.reliable ? 'Near threshold: watch closely' : 'Verify readings first', lo: 'Below threshold'}[level];
+    const label = E.priority;
     const oddsFmt = (f) => (f > 1000 ? '>1,000×' : f < 0.001 ? '<0.001×' : f.toFixed(2) + '×');
     const items = E.items.map((it) => ({label: it.name, v: it.contribution, sub: C.withUnit(it.value, it.unit)})).sort((a, b) => Math.abs(b.v) - Math.abs(a.v));
 
@@ -229,10 +244,18 @@
     const stepIcon = {caution: 'Verify first', area: 'Possible area to investigate', action: 'Recommended action'};
     const steps = `<ol class="steps">${E.steps.map((s) => `<li class="${s.kind}"><span class="kind">${stepIcon[s.kind]}</span>${esc(s.text)}</li>`).join('')}</ol>`;
 
-    $('result').innerHTML =
+    // At a glance: readable in about ten seconds. Everything else sits below, one click away.
+    const glance =
+      `<section class="panel glance ${level}" aria-labelledby="rg"><h2 id="rg" class="sr">At a glance</h2>` + warn +
+      `<div class="g-top"><span class="num">${pct(p, 1)}</span><div><span class="pill ${level}">${esc(label)}</span>` +
+      `<div class="g-sub">risk of the dataset's <em>Needs Maintenance</em> label · selected threshold ${pct(thr, 0)}</div></div></div>` +
+      `<dl class="g-list"><div><dt>Why</dt><dd>${esc(E.glance.reason)}</dd></div><div><dt>Do this next</dt><dd>${esc(E.glance.next)}</dd></div></dl>` +
+      `<p class="hint">Model estimate, not a diagnosis. A person decides what to inspect and repair.</p></section>`;
+
+    $('result').innerHTML = glance +
+      `<details class="more" id="more"><summary>Show the full explanation, sensor chart, next steps and limitations</summary>` +
       // A. Assessment
-      `<section class="panel" aria-labelledby="ra"><h2 id="ra">A. Maintenance assessment</h2>` + warn +
-      `<div class="risk"><span class="num">${pct(p, 1)}</span><span class="pill ${level}">${esc(label)}</span></div>` +
+      `<section class="panel" aria-labelledby="ra"><h2 id="ra">A. Maintenance assessment</h2>` +
       `<p class="muted">Predicted probability of the dataset's <em>Needs Maintenance</em> label · inspection threshold <strong>${pct(thr, 0)}</strong></p>` +
       `<div class="bar" role="img" aria-label="Risk ${pct(p, 1)}, threshold ${pct(thr, 0)}"><div class="mark" style="left:${thr * 100}%"></div><div class="dot" style="left:${Math.min(Math.max(p, 0.01), 0.99) * 100}%"></div></div>` +
       `<div class="bar-labels"><span>0%</span><span>Threshold ${pct(thr, 0)}</span><span>100%</span></div>` +
@@ -256,7 +279,9 @@
       `<li>This is a predictive classification model, not a fault-diagnosis system. It cannot say <em>what</em> is wrong, only how engines like this one were labeled in the dataset.</li>` +
       `<li><strong>Confirmed diagnosis:</strong> not available. The dataset has no fault descriptions, and its label definition is unknown.</li>` +
       `<li>Manufacturer safety specifications are not included in the dataset. Compare readings with the specifications for your engine.</li>` +
-      `<li>Human verification is required: sensor errors, unusual operating conditions, and readings outside the training range can all mislead the model.</li></ul></section>`;
+      `<li>Human verification is required: sensor errors, unusual operating conditions, and readings outside the training range can all mislead the model.</li></ul></section></details>`;
+    if (state.detailsOpen) $('more').open = true;
+    $('more').addEventListener('toggle', () => { state.detailsOpen = $('more').open; });
     barChart($('chart-local'), items, {diverging: true, fmt: (v) => (v >= 0 ? '+' : '') + v.toFixed(2), aria: 'Contribution of each sensor reading to this engine\'s risk'});
   }
 
@@ -478,7 +503,37 @@
     $('thr-pred').value = state.threshold; $('thr-pred-out').textContent = f2(state.threshold);
   }
 
+  /* ---------- reset demo ---------- */
+  function resetDemo() {
+    Object.assign(state, {threshold: DEFAULTS.threshold, ratio: DEFAULTS.ratio, unit: DEFAULTS.unit, capPct: DEFAULTS.capPct, fleet: null, capN: null, lastRow: null, detailsOpen: false});
+    // Predict
+    F.forEach((f, i) => { const e = $('in-' + i); e.value = ''; e.removeAttribute('aria-invalid'); });
+    $('form-errors').hidden = true;
+    $('result').innerHTML = RESULT_PLACEHOLDER;
+    // Fleet
+    $('csv').value = '';
+    $('fleet-msg').hidden = true; $('fleet-out').hidden = true;
+    $('cap').value = ''; $('cap').disabled = true; $('cap-hint').textContent = 'Upload a file first.';
+    $('filter').value = 'inspect';
+    // Shared settings and Business assumptions
+    ['thr-fleet', 'thr-biz', 'thr-pred'].forEach((id) => { $(id).value = DEFAULTS.threshold; });
+    ['thr-fleet-out', 'thr-biz-out', 'thr-pred-out'].forEach((id) => { $(id).textContent = f2(DEFAULTS.threshold); });
+    $('unit').value = DEFAULTS.unit;
+    $('ratio').value = DEFAULTS.ratio; $('ratio-out').textContent = DEFAULTS.ratio + '×';
+    $('cap-pct').value = DEFAULTS.capPct; $('cap-pct-out').textContent = DEFAULTS.capPct + '%';
+    // Insights
+    $('curve-sensor').value = '0';
+    renderOverview(); renderBusiness(); drawCurve();
+    const t = $('toast');
+    t.textContent = 'Demo reset: inputs cleared and default settings restored.';
+    t.classList.add('show');
+    clearTimeout(resetDemo.timer);
+    resetDemo.timer = setTimeout(() => t.classList.remove('show'), 2600);
+    window.scrollTo(0, 0);
+  }
+
   /* ---------- start ---------- */
+  $('btn-reset').addEventListener('click', resetDemo);
   $('r-auc').textContent = f2(M.test.auc);
   $('r-auc-pct').textContent = pct(M.test.auc, 0);
   buildForm(); buildFleet(); buildBusiness();
