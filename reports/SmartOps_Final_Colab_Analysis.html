@@ -389,7 +389,7 @@ h3.nb-h { font-size: 1.15rem; } h4.nb-h { font-size: 1.05rem; } h5.nb-h { font-s
       <div><span class="pill fresh">FRESH</span><p>Re-executed in <code>SmartOps_Final_Colab_Analysis.ipynb</code> from the raw data: dataset checks, representative models of each family, nested CV of the spline LR, test evaluation, importance, thresholds and costs.</p></div>
       <div><span class="pill hist">HISTORICAL</span><p>Produced earlier by the scripts and notebooks shown with this tag. Their saved results (99 configurations, boosting test predictions) are loaded and verified, <b>not rerun</b>, in the final notebook.</p></div>
       <div><span class="lbl">Executed notebook, embedded below</span><p>All code cells with the outputs saved by Colab (tables, charts, 16/16 verification checks). Rendered from the executed notebook; nothing was rerun or edited.</p></div>
-      <div><span class="lbl">Run it yourself</span><p><a href="https://colab.research.google.com/github/cynthia-0316/smartops/blob/feat/final-colab-analysis/notebooks/SmartOps_Final_Colab_Analysis.ipynb" target="_blank" rel="noopener">Open the notebook in Google Colab</a>, then Runtime &gt; Run all (about 15 to 25 minutes, no local install).</p></div>
+      <div><span class="lbl">Run it yourself</span><p>Open the notebook in Google Colab, then Runtime &gt; Run all (about 15 to 25 minutes, no local install).</p></div>
     </div>
     <div class="app-bar">
       <button type="button" id="app-expand">Expand all</button>
@@ -402,7 +402,6 @@ h3.nb-h { font-size: 1.15rem; } h4.nb-h { font-size: 1.05rem; } h5.nb-h { font-s
     <div class="fam-top"><h3>Executed Colab notebook: code and real outputs</h3><span class="pill fresh">EXECUTED IN COLAB</span></div>
     <p class="note">Every cell in the order it ran: 22 code cells, 8 charts, no error outputs. Tables, charts and printed text are the outputs Colab saved; nothing was rerun or edited after the run. Sections A to M below show the same code by topic, plus the saved historical scripts.</p>
     <div class="nb-cells"><div class="nb-md"><h3 class="nb-h">SmartOps Final Analysis: Engine Condition Prediction (CIS 508)</h3>
-<p class="nb-p"><b>File:</b> <code>notebooks/SmartOps_Final_Colab_Analysis.ipynb</code> &nbsp;|&nbsp; <b>Repository:</b> <a href="https://github.com/cynthia-0316/smartops" target="_blank" rel="noopener">https://github.com/cynthia-0316/smartops</a></p>
 <p class="nb-p">This notebook is the executable, reproducible record behind the <i>SmartOps Model Lineup</i> page. Run it top to bottom in Google Colab (<b>Runtime &gt; Run all</b>, about 15-25 minutes on a free CPU runtime). Nothing needs to be installed locally.</p>
 <h5 class="nb-h">What is freshly executed here, and what is loaded from the repository</h5>
 <p class="nb-p">Every output below is tagged, so nobody has to guess:</p>
@@ -2083,7 +2082,7 @@ The browser dashboard's own model file (dashboard/model/model.json, PR #29) is N
 Final test AUC (fresh): 0.7099 | GAM: 0.7095
 </pre></div></div>
 <div class="nb-md"><h4 class="nb-h">M. Reproduction instructions, dependencies and verification summary</h4>
-<ol class="plain"><li>Open the notebook in Colab: <code>https://colab.research.google.com/github/cynthia-0316/smartops/blob/feat/final-colab-analysis/notebooks/SmartOps_Final_Colab_Analysis.ipynb</code></li><li><b>Runtime &gt; Run all</b>. Internet access is required (GitHub for the saved experiment artifacts, Hugging Face for the data).</li><li>The last cell exports this executed notebook to HTML and downloads it. Provenance of the code: <code>src/common.py</code>, <code>experiments/harness.py</code>, <code>experiments/models.py</code>, <code>experiments/batch1.py</code>-<code>batch5.py</code>, <code>experiments/nested_final.py</code>, <code>experiments/torch_nets.py</code>, and <code>notebooks/*.ipynb</code> (all printed in full in the results page's code appendix).</li><li>Dependencies: pandas, numpy, scipy, scikit-learn, matplotlib, joblib (preinstalled in Colab) plus <code>pygam</code> and <code>catboost</code> (installed in Section 0). Historical-only dependencies (not needed here): <code>interpret</code> (EBM), <code>torch</code>, <code>xgboost</code>, <code>lightgbm</code>.</li></ol></div>
+<ol class="plain"><li>Open the notebook in Google Colab.</li><li><b>Runtime &gt; Run all</b>. Internet access is required (GitHub for the saved experiment artifacts, Hugging Face for the data).</li><li>The last cell exports this executed notebook to HTML and downloads it. Provenance of the code: <code>src/common.py</code>, <code>experiments/harness.py</code>, <code>experiments/models.py</code>, <code>experiments/batch1.py</code>-<code>batch5.py</code>, <code>experiments/nested_final.py</code>, <code>experiments/torch_nets.py</code>, and <code>notebooks/*.ipynb</code> (all printed in full in the results page's code appendix).</li><li>Dependencies: pandas, numpy, scipy, scikit-learn, matplotlib, joblib (preinstalled in Colab) plus <code>pygam</code> and <code>catboost</code> (installed in Section 0). Historical-only dependencies (not needed here): <code>interpret</code> (EBM), <code>torch</code>, <code>xgboost</code>, <code>lightgbm</code>.</li></ol></div>
 <div class="nbcell file"><div class="file-head"><span class="pill fresh">FRESH</span><span class="fn">In [43]</span><span class="lb">notebook code cell 21 of 22</span><span class="meta">35 lines</span><button type="button" class="copy-btn" aria-label="Copy code of cell 21">Copy code</button></div><pre tabindex="0"><code class="nb-code">checks = {}
 checks["19,535 total observations"] = len(full) == 19535 and N + len(YT) == 19535
 checks["16,604 development rows"] = N == 16604
@@ -2250,9 +2249,9 @@ except Exception as e:
   <div class="card">
     <h3>Reproduction instructions</h3>
     <pre class="repro" tabindex="0">Colab (recommended, nothing to install locally)
-  1. Open the notebook link above.
+  1. Open the notebook in Google Colab.
   2. Runtime &gt; Run all. The first cell installs pygam and catboost; data comes from Hugging Face,
-     saved experiment artifacts from this GitHub repository.
+     saved experiment artifacts from the project repository.
   3. The last cell exports the executed notebook to SmartOps_Final_Colab_Analysis.html and downloads it.
 
 Rebuild this page (Node.js only)

@@ -254,7 +254,7 @@ const appendix = `
       <div><span class="pill fresh">FRESH</span><p>Re-executed in <code>SmartOps_Final_Colab_Analysis.ipynb</code> from the raw data: dataset checks, representative models of each family, nested CV of the spline LR, test evaluation, importance, thresholds and costs.</p></div>
       <div><span class="pill hist">HISTORICAL</span><p>Produced earlier by the scripts and notebooks shown with this tag. Their saved results (99 configurations, boosting test predictions) are loaded and verified, <b>not rerun</b>, in the final notebook.</p></div>
       <div><span class="lbl">Executed notebook, embedded below</span><p>All code cells with the outputs saved by Colab (tables, charts, 16/16 verification checks). Rendered from the executed notebook; nothing was rerun or edited.</p></div>
-      <div><span class="lbl">Run it yourself</span><p><a href="${colabHtml}" target="_blank" rel="noopener">Open the notebook in Google Colab</a>, then Runtime &gt; Run all (about 15 to 25 minutes, no local install).</p></div>
+      <div><span class="lbl">Run it yourself</span><p>Open the notebook in Google Colab, then Runtime &gt; Run all (about 15 to 25 minutes, no local install).</p></div>
     </div>
     <div class="app-bar">
       <button type="button" id="app-expand">Expand all</button>
@@ -269,9 +269,9 @@ const appendix = `
   <div class="card">
     <h3>Reproduction instructions</h3>
     <pre class="repro" tabindex="0">Colab (recommended, nothing to install locally)
-  1. Open the notebook link above.
+  1. Open the notebook in Google Colab.
   2. Runtime &gt; Run all. The first cell installs pygam and catboost; data comes from Hugging Face,
-     saved experiment artifacts from this GitHub repository.
+     saved experiment artifacts from the project repository.
   3. The last cell exports the executed notebook to SmartOps_Final_Colab_Analysis.html and downloads it.
 
 Rebuild this page (Node.js only)
