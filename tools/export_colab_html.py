@@ -55,6 +55,10 @@ provenance = ('<div style="max-width:1040px;margin:16px auto;padding:10px 14px;b
               '<b>Provenance.</b> Notebook <code>SmartOps_Final_Colab_Analysis.ipynb</code> was executed in Google Colab; its outputs below are the saved '
               'Colab outputs. This HTML was produced from that executed notebook by <code>nbconvert</code> '
               '(conversion only, no cell was rerun). Code cells: %d, charts: %d, error outputs: 0.</div>' % (len(code), n_png))
+# second pass on the rendered HTML: drop any remaining <script> block that calls Colab's JS API (presentation only)
+n_before = len(re.findall(r"<script", body, flags=re.I))
+body = re.sub(r"<script(?:(?!</script>).)*google.colab(?:(?!</script>).)*</script>", "", body, flags=re.S | re.I)
+print(f"scripts before {n_before}, after {len(re.findall(r'<script', body, flags=re.I))}")
 assert "</head>" in body and "<body" in body
 body = body.replace("</head>", theme + "</head>", 1)
 body = re.sub(r"(<body[^>]*>)", lambda m: m.group(1) + provenance, body, count=1)
