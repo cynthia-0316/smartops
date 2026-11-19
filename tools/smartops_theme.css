@@ -1,0 +1,16 @@
+:root { --jp-ui-font-family: "IBM Plex Sans", system-ui, sans-serif; --jp-content-font-family: "IBM Plex Sans", system-ui, sans-serif; --jp-code-font-family: "IBM Plex Mono", ui-monospace, monospace;
+  --jp-layout-color0: #f4f6f8; --jp-layout-color1: #f4f6f8; --jp-brand-color1: #2a78d6; --jp-content-link-color: #2a78d6; --jp-ui-font-color1: #11161c; --jp-content-font-color1: #11161c; }
+body, body.jp-Notebook, .jp-Notebook { background: #f4f6f8 !important; color: #11161c; font-family: "IBM Plex Sans", system-ui, sans-serif; }
+.jp-Notebook { max-width: 1040px; margin: 0 auto; }
+h1, h2, h3, .jp-RenderedHTMLCommon h1, .jp-RenderedHTMLCommon h2, .jp-RenderedHTMLCommon h3 { font-family: "Archivo", "Helvetica Neue", Arial, sans-serif !important; letter-spacing: -0.01em; color: #11161c; }
+.jp-RenderedHTMLCommon a { color: #2a78d6; }
+.jp-RenderedHTMLCommon table th { color: #6f7884; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.06em; }
+.jp-RenderedHTMLCommon code, .jp-Notebook pre, .highlight pre { font-family: "IBM Plex Mono", ui-monospace, monospace; }
+.jp-InputArea-editor, .jp-CodeCell .jp-InputArea-editor { background: #ffffff !important; border: 1px solid #e3e7eb !important; border-radius: 8px; }
+.jp-OutputArea-output, .jp-RenderedText pre { color: #11161c; }
+.jp-InputPrompt { color: #2a78d6 !important; } .jp-OutputPrompt { color: #eb6834 !important; }
+.highlight .k, .highlight .kn, .highlight .kc, .highlight .ow { color: #2a78d6; font-weight: 600; }
+.highlight .s, .highlight .s1, .highlight .s2, .highlight .sa, .highlight .sb, .highlight .si { color: #eb6834; }
+.highlight .c1, .highlight .c, .highlight .cm { color: #6f7884; font-style: italic; }
+.highlight .mi, .highlight .mf { color: #8a5a00; } .highlight .nb, .highlight .nf, .highlight .nn { color: #2a78d6; font-weight: 500; }
+@media (max-width: 700px) { .jp-Notebook { padding: 0 8px; } }

@@ -1,0 +1,37 @@
+name: Export Colab HTML (conversion only)
+
+# Converts the already-executed Colab notebook to HTML. No model code is run.
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/final-colab-analysis]
+    paths:
+      - reports/colab_run/SmartOps_Final_Colab_Analysis.executed.ipynb
+      - tools/export_colab_html.py
+      - tools/smartops_theme.css
+      - .github/workflows/export-colab-html.yml
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install nbconvert only
+        run: python -m pip install --quiet nbconvert nbformat
+      - name: Convert executed notebook to HTML (no execution)
+        run: >
+          python tools/export_colab_html.py
+          reports/colab_run/SmartOps_Final_Colab_Analysis.executed.ipynb
+          SmartOps_Final_Colab_Analysis.html
+          notebooks/SmartOps_Final_Colab_Analysis.ipynb
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SmartOps_Final_Colab_Analysis_html
+          path: SmartOps_Final_Colab_Analysis.html
+          if-no-files-found: error
