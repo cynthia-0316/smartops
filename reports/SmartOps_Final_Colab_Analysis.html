@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>SmartOps Final Analysis</title>
+<title>SmartOps: Model Results, Python Code &amp; Reproducibility</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -153,6 +153,12 @@ footer { padding-block: 40px 56px; color: var(--muted); font-size: 0.82rem; disp
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
 html { scroll-behavior: smooth; }
 
+/* ---------- hero call-to-action ---------- */
+.cta { display: flex; flex-wrap: wrap; gap: 10px; }
+.cta .btn { font: 600 0.9rem/1 var(--f-body); text-decoration: none; padding: 11px 16px; border-radius: 8px; border: 1px solid var(--axis); background: var(--surface); color: var(--ink); }
+.cta .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.cta .btn:hover { filter: brightness(0.96); }
+nav.toc a.nav-code { color: var(--accent); font-weight: 600; }
 /* ---------- code appendix ---------- */
 .codelink { margin-top: 2px; font-size: 0.82rem; color: var(--muted); }
 .codelink a { font: 500 0.78rem/1 var(--f-mono); margin-left: 6px; text-decoration: none; border: 1px solid var(--axis); border-radius: 999px; padding: 4px 9px; display: inline-block; }
@@ -206,8 +212,10 @@ h3.nb-h { font-size: 1.15rem; } h4.nb-h { font-size: 1.05rem; } h5.nb-h { font-s
 
 <header class="wrap hero">
   <div class="eyebrow">SmartOps · CIS 508 · Engine condition prediction</div>
-  <h1>Every model we tried, and what each one taught us</h1>
-  <p class="lede">We ran 99 model configurations from 9 families to predict whether an engine needs maintenance from six sensor readings. Each family below explains how the model works, the variations we tried, and the score each variation got. The short version: once a model can bend its curves, they all land in the same place, about 0.70 AUC.</p>
+  <h1>SmartOps: Model Results, Python Code &amp; Reproducibility</h1>
+  <p class="lede">Explore our model experiments, performance comparisons, interactive visualizations, and complete Python analysis with executed Google Colab results.</p>
+  <div class="cta"><a class="btn primary" href="#code-appendix">View the Python code &amp; executed Colab results ↓</a><a class="btn" href="#overview">Start with the model results</a></div>
+  <p class="lede" style="font-size:0.95rem">We ran 99 model configurations from 9 families to predict whether an engine needs maintenance from six sensor readings. Each family below explains how the model works, the variations we tried, and the score each variation got. The short version: once a model can bend its curves, they all land in the same place, about 0.70 AUC.</p>
   <p class="lede" style="font-size:0.95rem">Results come first. Below them, the <a href="#code-appendix">Code &amp; Reproducibility Appendix</a> holds the <b>executed Google Colab notebook</b> (every code cell with its real output and charts) and all the Python code behind the saved experiments. This file is the final submission version.</p>
   <div class="tiles">
     <div class="tile"><span class="v">99</span><span class="l">configurations scored</span></div>
@@ -218,7 +226,7 @@ h3.nb-h { font-size: 1.15rem; } h4.nb-h { font-size: 1.05rem; } h5.nb-h { font-s
 </header>
 
 <nav class="toc" aria-label="Sections"><div class="wrap">
-  <a href="#overview">Overview</a><a href="#shapes">Risk curves</a><a href="#reading">Reading the scores</a><a href="#f-base">Baselines</a><a href="#f-linear">Linear</a><a href="#f-additive">Additive</a><a href="#f-nb">Naive Bayes</a><a href="#f-knn">kNN</a><a href="#f-trees">Forests</a><a href="#f-boost">Boosting</a><a href="#f-nn">Neural nets</a><a href="#f-ens">Ensembles</a><a href="#tricks">Other techniques</a><a href="#test">Test set</a><a href="#lessons">Lessons</a><a href="#runs">All runs</a><a href="#business">SmartOps use</a><a href="#code-appendix">Code appendix</a>
+  <a href="#overview">Overview</a><a href="#shapes">Risk curves</a><a href="#reading">Reading the scores</a><a href="#f-base">Baselines</a><a href="#f-linear">Linear</a><a href="#f-additive">Additive</a><a href="#f-nb">Naive Bayes</a><a href="#f-knn">kNN</a><a href="#f-trees">Forests</a><a href="#f-boost">Boosting</a><a href="#f-nn">Neural nets</a><a href="#f-ens">Ensembles</a><a href="#tricks">Other techniques</a><a href="#test">Test set</a><a href="#lessons">Lessons</a><a href="#runs">All runs</a><a href="#business">SmartOps use</a><a href="#code-appendix" class="nav-code">Code appendix</a>
 </div></nav>
 
 <main class="wrap">
