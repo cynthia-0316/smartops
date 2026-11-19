@@ -48,11 +48,13 @@ body = re.sub(r"(<body[^>]*>)", lambda m: m.group(1) + provenance, body, count=1
 out.write_text(body, encoding="utf-8")
 
 html = out.read_text(encoding="utf-8")
+import html as _html
+plain = _html.unescape(re.sub(r"<[^>]+>", "", html))   # highlighted code is split into spans
 checks = {
     "all 16 verification checks printed PASS": html.count("PASS ") >= 16 and "ALL CHECKS PASSED" in html,
     "no Python traceback in output": "Traceback (most recent call last)" not in html,
     "all figures embedded": html.count("data:image/png;base64") >= n_png and n_png >= 8,
-    "code visible": "def spline_lr(" in html and "load_test_once" in html,
+    "code visible": "def spline_lr(" in plain and "load_test_once" in plain and "def run_cv(" in plain,
 }
 for k, v in checks.items(): print(("OK   " if v else "FAIL ") + k)
 print(f"code cells {len(code)} | cells without outputs {no_out} | png outputs {n_png} | html {len(html)/1e6:.2f} MB")
