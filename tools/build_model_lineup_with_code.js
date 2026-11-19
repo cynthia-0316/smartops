@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Builds reports/SmartOps_Model_Lineup_with_Code.html from the existing results page
+ * Builds reports/SmartOps_Final_Colab_Analysis.html (results first, then all code) from the existing results page
  * (reports/smartops_models.html) plus a Code & Reproducibility Appendix.
  *
  * The appendix is generated from the real source files in this repository (nothing is typed in by hand),
@@ -123,7 +123,7 @@ function must(from, to, all) {
   page = all ? page.split(from).join(to) : page.replace(from, () => to);
 }
 
-must('<title>SmartOps Model Lineup</title>', '<title>SmartOps Model Lineup with Code</title>');
+must('<title>SmartOps Model Lineup</title>', '<title>SmartOps Final Analysis</title>');
 
 /* --- wording: the deployed model is the spline LR; the GAM has the best single CV score; no superiority claims --- */
 must('<li><b>Recommended model:</b> the GAM with 20 splines (CV 0.7041, test 0.7095). It is as accurate as anything else, fast, and you can plot exactly how each sensor moves the risk.</li>',
@@ -140,7 +140,7 @@ must('${esc(t.name)}${t.name.startsWith("GAM") ? ` <span class="tag best">best C
 /* --- nav, hero note, footer --- */
 must('<a href="#runs">All runs</a>', '<a href="#runs">All runs</a><a href="#business">SmartOps use</a><a href="#code-appendix">Code appendix</a>');
 must('</p>\n  <div class="tiles">',
-  '</p>\n  <p class="lede" style="font-size:0.95rem">Results come first. The complete Python code behind them is in the <a href="#code-appendix">Code &amp; Reproducibility Appendix</a> at the bottom. The official course submission is the executed Colab export, <code>SmartOps_Final_Colab_Analysis.html</code>; this page is the presentation version.</p>\n  <div class="tiles">');
+  '</p>\n  <p class="lede" style="font-size:0.95rem">Results come first. Below them, the <a href="#code-appendix">Code &amp; Reproducibility Appendix</a> holds the <b>executed Google Colab notebook</b> (every code cell with its real output and charts) and all the Python code behind the saved experiments. This file is the final submission version.</p>\n  <div class="tiles">');
 must('<span>Sources: the shared team results log', '<span>The Code &amp; Reproducibility Appendix is generated from the repository files by tools/build_model_lineup_with_code.js.</span>\n  <span>Sources: the shared team results log');
 
 /* --- new results-side sections, placed before the 99-run table --- */
@@ -216,11 +216,22 @@ details.sec .body { padding: 2px 18px 18px; display: grid; gap: 12px; }
 .tk-kw { color: var(--tk-kw); font-weight: 600; } .tk-str { color: var(--tk-str); } .tk-com { color: var(--tk-com); font-style: italic; }
 .tk-num { color: var(--tk-num); } .tk-fn { color: var(--tk-fn); } .tk-bi { color: var(--tk-bi); } .tk-dec { color: var(--tk-fn); }
 .repro { font: 400 0.8rem/1.5 var(--f-mono); background: var(--code-bg); color: var(--code-ink); border: 1px solid var(--grid); border-radius: 8px; padding: 10px 12px; overflow-x: auto; white-space: pre; margin: 0; }
+.nb-cells { display: grid; gap: 12px; }
+.nb-md { display: grid; gap: 8px; }
+.nb-md .nb-p, .nb-md ul, .nb-md ol { font-size: 0.9rem; color: var(--ink-2); }
+.nb-h { margin-top: 8px; }
+h3.nb-h { font-size: 1.15rem; } h4.nb-h { font-size: 1.05rem; } h5.nb-h { font-size: 0.95rem; }
+.nb-out { padding: 8px 12px 12px; display: grid; gap: 8px; border-top: 1px solid var(--grid); min-width: 0; }
+.nb-pre { margin: 0; font: 400 0.78rem/1.5 var(--f-mono); color: var(--ink); white-space: pre; overflow-x: auto; }
+.nb-err { color: #b3261e; }
+.nb-img { max-width: 100%; height: auto; border: 1px solid var(--grid); border-radius: 6px; background: #fff; }
+.nb-table table { font-size: 0.8rem; } .nb-table td, .nb-table th { text-align: right; white-space: nowrap; } .nb-table th:first-child, .nb-table td:first-child { text-align: left; }
 @media (max-width: 560px) { details.sec > summary { padding: 12px 12px; } details.sec .body { padding: 2px 10px 14px; } .file pre { font-size: 0.74rem; } }
 `;
 must('</style>', css + '</style>');
 
 const colabHtml = esc(COLAB_URL);
+const NB_RENDERED = require('./render_notebook.js')(path.join(ROOT, 'reports/colab_run/SmartOps_Final_Colab_Analysis.executed.ipynb'));
 const appendix = `
 <section id="code-appendix">
   <div class="sec-head">
@@ -232,7 +243,7 @@ const appendix = `
     <div class="provenance">
       <div><span class="pill fresh">FRESH</span><p>Re-executed in <code>SmartOps_Final_Colab_Analysis.ipynb</code> from the raw data: dataset checks, representative models of each family, nested CV of the spline LR, test evaluation, importance, thresholds and costs.</p></div>
       <div><span class="pill hist">HISTORICAL</span><p>Produced earlier by the scripts and notebooks shown with this tag. Their saved results (99 configurations, boosting test predictions) are loaded and verified, <b>not rerun</b>, in the final notebook.</p></div>
-      <div><span class="lbl">Official submission file</span><p><code>SmartOps_Final_Colab_Analysis.html</code>: exported from the executed Colab notebook; contains the code cells and their real outputs.</p></div>
+      <div><span class="lbl">Executed notebook, embedded below</span><p>All code cells with the outputs saved by Colab (tables, charts, 16/16 verification checks). Rendered from the executed notebook; nothing was rerun or edited.</p></div>
       <div><span class="lbl">Run it yourself</span><p><a href="${colabHtml}" target="_blank" rel="noopener">Open the notebook in Google Colab</a>, then Runtime &gt; Run all (about 15 to 25 minutes, no local install).</p></div>
     </div>
     <div class="app-bar">
@@ -242,6 +253,8 @@ const appendix = `
       <span class="note" id="app-count"></span>
     </div>
   </div>
+  ${NB_RENDERED}
+  <h3 style="margin-top:6px">Code by analysis section (A to M)</h3>
   <div id="app-list" style="display:grid;gap:10px"></div>
   <div class="card">
     <h3>Reproduction instructions</h3>
@@ -298,6 +311,15 @@ const script = `
   }
   function highlightOther(code, file) { return /\\.(py|ipynb)$/.test(file) ? highlight(code) : esc(code); }
 
+  document.querySelectorAll(".nbcell").forEach(function (cell) {
+    var code = cell.querySelector("code"), raw = code.textContent; code.innerHTML = highlight(raw);
+    cell.querySelector(".copy-btn").addEventListener("click", function (e) {
+      var b = e.currentTarget;
+      function done(ok) { b.textContent = ok ? "Copied" : "Press Ctrl+C"; setTimeout(function () { b.textContent = "Copy code"; }, 1500); }
+      function fallback() { var ta = document.createElement("textarea"); ta.value = raw; ta.style.position = "fixed"; ta.style.opacity = "0"; document.body.appendChild(ta); ta.select(); var ok = false; try { ok = document.execCommand("copy"); } catch (x) {} ta.remove(); done(ok); }
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(raw).then(function () { done(true); }, fallback); else fallback();
+    });
+  });
   var list = document.getElementById("app-list"), blocks = [];
   SECTIONS.forEach(function (s) {
     var d = document.createElement("details"); d.className = "sec"; d.id = "code-" + s.id;
@@ -346,7 +368,7 @@ const script = `
 must('<div id="tip" hidden></div>', '<div id="tip" hidden></div>');
 page = page.replace(/<\/body>/, () => script + '</body>');
 
-const outFile = path.join(ROOT, 'reports', 'SmartOps_Model_Lineup_with_Code.html');
+const outFile = path.join(ROOT, 'reports', 'SmartOps_Final_Colab_Analysis.html');
 fs.writeFileSync(outFile, page);
 console.log('wrote', path.relative(ROOT, outFile), (page.length / 1024).toFixed(0) + ' KB;',
   payload.length + ' sections,', payload.reduce((n, s) => n + s.items.length, 0) + ' code blocks,',
