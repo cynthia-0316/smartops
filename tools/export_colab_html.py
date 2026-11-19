@@ -35,6 +35,19 @@ for pat in (r"ghp_[A-Za-z0-9]{20,}", r"hf_[A-Za-z0-9]{30,}", r"AKIA[0-9A-Z]{16}"
 if problems:
     print("REFUSING TO EXPORT:", *problems, sep="\n  - "); sys.exit(1)
 
+# Presentation-only cleanup: Colab's DataFrame display attaches a <script> that needs Colab's JS API (google.colab) and a hidden
+# 'convert to interactive table' button. Outside Colab they only raise console errors; the tables themselves are kept untouched.
+stripped = 0
+for c in code:
+    for o in c.get("outputs", []):
+        h = o.get("data", {}).get("text/html")
+        if h is not None:
+            t = "".join(h) if isinstance(h, list) else h
+            t2 = re.sub(r"<script.*?</script>", "", t, flags=re.S | re.I)
+            t2 = re.sub(r'<button class="colab-df-convert".*?</button>', "", t2, flags=re.S)
+            if t2 != t: stripped += 1; o["data"]["text/html"] = t2
+print(f"removed Colab-only scripts from {stripped} table outputs (table content unchanged)")
+nb.metadata["name"] = "SmartOps Final Colab Analysis"
 body, _ = HTMLExporter(template_name="lab").from_notebook_node(nb)
 theme = ('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">\n'
          '<style id="smartops-theme">\n' + (here / "smartops_theme.css").read_text() + "</style>\n")
@@ -53,6 +66,7 @@ plain = _html.unescape(re.sub(r"<[^>]+>", "", html))   # highlighted code is spl
 checks = {
     "all 16 verification checks printed PASS": html.count("PASS ") >= 16 and "ALL CHECKS PASSED" in html,
     "no Python traceback in output": "Traceback (most recent call last)" not in html,
+    "no Colab-only scripts left": "google.colab.kernel" not in html,
     "all figures embedded": html.count("data:image/png;base64") >= n_png and n_png >= 8,
     "code visible": "def spline_lr(" in plain and "load_test_once" in plain and "def run_cv(" in plain,
 }
