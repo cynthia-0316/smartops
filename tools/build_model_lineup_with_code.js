@@ -138,14 +138,13 @@ must('${esc(t.name)}${t.name.startsWith("GAM") ? ` <span class="tag best">best C
   '${esc(t.name)}${t.name.startsWith("GAM") ? ` <span class="tag best">best CV</span>` : ""}${t.name.startsWith("Spline") ? ` <span class="tag">deployed in dashboard</span>` : ""}');
 
 /* --- nav, hero note, footer --- */
-must('<a href="#runs">All runs</a>', '<a href="#runs">All runs</a><a href="#business">SmartOps use</a>');
+must('<a href="#runs">All runs</a>', '<a href="#runs">All runs</a><a href="#business">SmartOps use</a><a href="#code-appendix" class="nav-code">Code appendix</a>');
 must('</p>\n  <div class="tiles">',
   '</p>\n  <p class="lede" style="font-size:0.95rem">Results come first. Below them, the <a href="#code-appendix">Code &amp; Reproducibility Appendix</a> holds the <b>executed Google Colab notebook</b> (every code cell with its real output and charts) and all the Python code behind the saved experiments. This file is the final submission version.</p>\n  <div class="tiles">');
 /* --- hero: heading and subtitle say the page holds findings AND code; prominent jump links --- */
 must('<h1>Every model we tried, and what each one taught us</h1>', '<h1>SmartOps: Model Results, Python Code &amp; Reproducibility</h1>');
 must('<p class="lede">We ran 99 model configurations',
   '<p class="lede">Explore our model experiments, performance comparisons, interactive visualizations, and complete Python analysis with executed Google Colab results.</p>\n  <div class="cta"><a class="btn primary" href="#code-appendix">View the Python code &amp; executed Colab results ↓</a><a class="btn" href="#overview">Start with the model results</a></div>\n  <p class="lede" style="font-size:0.95rem">We ran 99 model configurations');
-must('<a href="#overview">Overview</a>', '<a href="#code-appendix" class="nav-code">Python code ↓</a><a href="#overview">Overview</a>');
 must('<span>Sources: the shared team results log', '<span>The Code &amp; Reproducibility Appendix is generated from the repository files by tools/build_model_lineup_with_code.js.</span>\n  <span>Sources: the shared team results log');
 
 /* --- new results-side sections, placed before the 99-run table --- */
