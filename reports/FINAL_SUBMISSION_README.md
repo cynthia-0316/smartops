@@ -4,7 +4,7 @@
 
 | File | Role |
 |---|---|
-| `reports/SmartOps_Final_Colab_Analysis.html` | **Final submission version (merged).** Results first (the SmartOps Model Lineup page: overview, risk curves, 9 families, test set, lessons, SmartOps use, 99-run table), then the Code & Reproducibility Appendix: the **executed Colab notebook** (22 code cells with their real outputs, 19 tables, 8 charts, 16/16 checks) rendered in the same style, followed by sections A to M with all repo code. Built by `tools/build_model_lineup_with_code.js` and `tools/render_notebook.js`. |
+| `reports/SmartOps_Final_Colab_Analysis.html` | **Final submission version (merged).** Results first (the SmartOps Model Lineup page: overview, risk curves, 9 families, test set, lessons, SmartOps use, 99-run table), then the Code appendix: the **executed Colab notebook** (22 code cells with their real outputs, 19 tables, 8 charts, 16/16 checks) rendered in the same style, followed by sections A to M with all repo code. Built by `tools/build_model_lineup_with_code.js` and `tools/render_notebook.js`. |
 | `reports/colab_run/SmartOps_Final_Colab_Analysis.html` | **Strict nbconvert export** of the same executed notebook (Jupyter layout with the SmartOps palette), kept as the plain "HTML from the executed notebook" record. Produced by the `Export Colab HTML` GitHub Actions workflow (`tools/export_colab_html.py`). |
 | `reports/colab_run/SmartOps_Final_Colab_Analysis.executed.ipynb` | The notebook exactly as executed in Google Colab (outputs included). Source of both HTML files. |
 | `notebooks/SmartOps_Final_Colab_Analysis.ipynb` | The same notebook without outputs (what Colab opens from GitHub). |
