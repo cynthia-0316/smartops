@@ -70,6 +70,8 @@ checks = {
     "all figures embedded": html.count("data:image/png;base64") >= n_png and n_png >= 8,
     "code visible": "def spline_lr(" in plain and "load_test_once" in plain and "def run_cv(" in plain,
 }
+if "google.colab.kernel" in html:
+    _i = html.index("google.colab.kernel"); print("leftover context:", repr(html[max(0, _i - 300):_i + 100]))
 for k, v in checks.items(): print(("OK   " if v else "FAIL ") + k)
 print(f"code cells {len(code)} | cells without outputs {no_out} | png outputs {n_png} | html {len(html)/1e6:.2f} MB")
 sys.exit(0 if all(checks.values()) else 1)
