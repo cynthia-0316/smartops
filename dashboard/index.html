@@ -64,6 +64,39 @@
       <div id="ov-reco-body"></div>
     </div>
   </div>
+
+  <div class="panel" id="ov-usecase">
+    <h2>How a company would use SmartOps</h2>
+    <p class="hint">An illustrative scenario for a fleet or plant maintenance planner. It is not a deployed system, and it is not based on a real company.</p>
+    <div class="grid3">
+      <article>
+        <h3>1. Weekly routine</h3>
+        <ul>
+          <li>Export the latest reading for each engine into a CSV (six sensors).</li>
+          <li>Upload it on <a href="#fleet">Fleet Priorities</a>. Enter this week's inspection capacity.</li>
+          <li>Inspect from the top of the ranked list down. Export the list for the workshop.</li>
+          <li>Check any engine with an out-of-range warning first. The sensor may be faulty.</li>
+        </ul>
+      </article>
+      <article>
+        <h3>2. Is the model worth using?</h3>
+        <ul>
+          <li>On <a href="#business">Business Impact</a>, enter your own costs and compare three options: <strong>inspect every engine</strong>, <strong>inspect a random sample</strong> of the same size, or <strong>inspect the highest-risk engines first</strong>.</li>
+          <li>If a missed case costs about the same as an unnecessary inspection, ranking by risk lowers expected cost. If a miss costs about 2.5 times more, inspecting everything is about as cheap.</li>
+          <li>The costs shown are assumptions. Replace them with real figures.</li>
+        </ul>
+      </article>
+      <article>
+        <h3>3. If sensors were connected live</h3>
+        <ul>
+          <li><strong>Assumption, not built:</strong> this prototype reads a file you upload. It has no connection to live sensors.</li>
+          <li>A live feed could send each engine's latest six readings to the same model on a schedule (for example once a day) and refresh the ranked list.</li>
+          <li>It would need the same sensors and units as the training data, a rule for faulty or missing readings, and a place to record each decision.</li>
+          <li>The model sees one snapshot per engine. It does not track trends over time.</li>
+        </ul>
+      </article>
+    </div>
+  </div>
 </section>
 
 <!-- ============ PREDICT ============ -->
