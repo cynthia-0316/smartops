@@ -250,7 +250,7 @@
       `<div class="g-top"><span class="num">${pct(p, 1)}</span><div><span class="pill ${level}">${esc(label)}</span>` +
       `<div class="g-sub">risk of the dataset's <em>Needs Maintenance</em> label · selected threshold ${pct(thr, 0)}</div></div></div>` +
       `<dl class="g-list"><div><dt>Why</dt><dd>${esc(E.glance.reason)}</dd></div><div><dt>Do this next</dt><dd>${esc(E.glance.next)}</dd></div></dl>` +
-      `<p class="hint">Model estimate, not a diagnosis. A person decides what to inspect and repair.</p></section>`;
+      `<p class="hint">Model estimate, not a fault diagnosis. It shows which readings to check first, not where the problem is. A person decides what to inspect and repair.</p></section>`;
 
     $('result').innerHTML = glance +
       `<details class="more" id="more"><summary>Show the full explanation, sensor chart, next steps and limitations</summary>` +
@@ -273,6 +273,7 @@
       `<p class="hint">Effect of each reading on this engine's log-odds, measured against each sensor's average effect in the development data. <span style="color:#c2410c">Orange bars raise the score</span>, <span style="color:#1f4fd8">blue bars lower it</span>. Log-odds = ${f2(model.intercept)} (reference level) + the six bars, exactly.</p><div id="chart-local"></div></section>` +
       `<section class="panel" aria-labelledby="rd"><h2 id="rd">D. Recommended next steps</h2>` +
       `<p class="hint">In order of priority. These are areas to check, not a diagnosis.</p>${steps}` +
+      `<div class="next"><strong>Where is the problem?</strong> The model cannot say. It only points to the readings that raised the score. Follow your own maintenance checklist or the manufacturer's procedure for those sensors. A team-approved checklist can be added here.</div>` +
       `<div class="next">Human review is required before any repair decision.</div></section></div>` +
       // E. Limitations
       `<section class="panel" aria-labelledby="re"><h2 id="re">E. Model limitations</h2><ul>` +
