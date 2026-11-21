@@ -97,6 +97,38 @@
       </article>
     </div>
   </div>
+
+  <div class="panel" id="ov-business-reco">
+    <h2>Business recommendation</h2>
+    <p class="hint">For the maintenance manager. Based on this dataset and on assumed costs. It is not validated on a real fleet.</p>
+    <div class="grid3">
+      <article>
+        <h3>Use SmartOps when</h3>
+        <ul>
+          <li>You cannot inspect every engine in the period.</li>
+          <li>A missed case costs clearly more than an unnecessary inspection, but not so much that inspecting everything is cheaper.</li>
+          <li>A planner will review the ranked list. The score decides the order of inspection, not whether repair is needed.</li>
+        </ul>
+      </article>
+      <article>
+        <h3>Do not rely on it when</h3>
+        <ul>
+          <li>A missed case costs about 2.5 times an unnecessary inspection or more. Inspecting every engine is then about as cheap.</li>
+          <li>Readings come from other engine types or sensors than the training data, or a reading is outside the training range.</li>
+          <li>You need to know which part is faulty. The model cannot say.</li>
+        </ul>
+      </article>
+      <article>
+        <h3>Before adopting it</h3>
+        <ul>
+          <li>Re-check the model on your own fleet data and your own definition of "needs maintenance".</li>
+          <li>Replace the assumed costs with your real inspection and missed-case costs.</li>
+          <li>Start with a small pilot. Record each inspection result and compare it with the score every month.</li>
+          <li>Keep routine inspections for engines below the threshold.</li>
+        </ul>
+      </article>
+    </div>
+  </div>
 </section>
 
 <!-- ============ PREDICT ============ -->
