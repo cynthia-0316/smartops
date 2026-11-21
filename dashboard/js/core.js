@@ -277,6 +277,9 @@
       if (k < 0) missingColumns.push(f); else index[f] = k;
     });
     const used = new Set(Object.values(index));
+    // An optional engine identifier column is carried through to the results (it is never used by the model).
+    const idIdx = header.findIndex(function (h, k) { return !used.has(k) && ID_COLUMN_NAMES.indexOf(normName(h)) >= 0; });
+    if (idIdx >= 0) used.add(idIdx);
     const extraColumns = header.filter(function (_, k) { return !used.has(k); });
     if (missingColumns.length) {
       return {error: 'Missing required column(s): ' + missingColumns.join(', ') + '.', rows: [], invalid: [], missingColumns: missingColumns, extraColumns: extraColumns};
@@ -291,15 +294,18 @@
       if (!v.ok) { invalid.push({rowNumber: rowNumber, errors: v.errors}); continue; }
       const p = model.predict(v.values);
       rows.push({
-        rowNumber: rowNumber, values: v.values, risk: p, warnings: v.warnings,
+        rowNumber: rowNumber, id: idIdx >= 0 ? String(grid[r][idIdx] === undefined ? '' : grid[r][idIdx]).trim() : '',
+        values: v.values, risk: p, warnings: v.warnings,
         outOfRange: outsideTraining(model, v.values),
         driver: mainDriver(model, v.values)
       });
     }
     rows.sort(function (a, b) { return b.risk - a.risk || a.rowNumber - b.rowNumber; });
     rows.forEach(function (x, k) { x.rank = k + 1; });
-    return {rows: rows, invalid: invalid, missingColumns: [], extraColumns: extraColumns};
+    return {rows: rows, invalid: invalid, missingColumns: [], extraColumns: extraColumns, idColumn: idIdx >= 0 ? header[idIdx] : null};
   }
+
+  const ID_COLUMN_NAMES = ['engineid', 'id', 'unitid', 'assetid', 'vehicleid', 'enginenumber', 'engineno', 'serialnumber', 'serial', 'equipmentid'];
 
   function csvEscape(v) {
     const s = String(v);
@@ -333,6 +339,61 @@
         r.risk.toFixed(6), above ? 'yes' : 'no', within ? 'yes' : 'no', fleetAction(r, threshold, capacity),
         d ? d.name : 'None (no single sensor driver)', d ? (d.oddsFactor > 1000 ? '>1000' : d.oddsFactor.toFixed(2)) : '', reviewFocus(d), oor
       ]).map(csvEscape).join(','));
+    });
+    return lines.join('\n') + '\n';
+  }
+
+  /* ---------- Fleet workflow: predict every engine first, prioritise inspections only when needed ---------- */
+
+  const NEEDS_INSPECTION = 'Needs Inspection';
+  const BELOW_THRESHOLD = 'Below Inspection Threshold';
+
+  // Classification depends only on the model score and the threshold; never on inspection capacity.
+  function recommendation(r, threshold) {
+    return r.risk >= threshold ? NEEDS_INSPECTION : BELOW_THRESHOLD;
+  }
+
+  function fleetSummary(rows, threshold) {
+    const total = rows.length;
+    const needs = rows.filter(function (r) { return r.risk >= threshold; }).length;
+    return {
+      total: total, needs: needs, below: total - needs, pctFlagged: total ? needs / total : 0,
+      outOfRange: rows.filter(function (r) { return r.outOfRange && r.outOfRange.length; }).length
+    };
+  }
+
+  // Optional business step. Picks the highest-risk flagged engines up to the capacity. The scores are not touched.
+  function prioritize(rows, threshold, capacity) {
+    const flagged = rows.filter(function (r) { return r.risk >= threshold; })
+      .sort(function (a, b) { return b.risk - a.risk || a.rowNumber - b.rowNumber; });
+    const n = Number.isFinite(capacity) && capacity >= 1 ? Math.floor(capacity) : 0;
+    const selected = flagged.slice(0, n);
+    return {flagged: flagged.length, capacity: n, selected: selected, outside: flagged.length - selected.length, spare: Math.max(0, n - flagged.length)};
+  }
+
+  function detailCells(model, r, threshold) {
+    const d = r.driver;
+    const oor = r.outOfRange && r.outOfRange.length ? 'Outside training range: ' + r.outOfRange.join('; ') : '';
+    return [r.risk.toFixed(6), recommendation(r, threshold),
+      d ? d.name : 'None (no single sensor driver)', d ? (d.oddsFactor > 1000 ? '>1000' : d.oddsFactor.toFixed(2)) : '', reviewFocus(d), oor];
+  }
+  const DETAIL_HEAD = ['predicted_probability', 'inspection_recommendation', 'main_model_driver', 'driver_odds_multiplier', 'review_focus', 'reliability_note'];
+
+  // Complete prediction results: every valid engine, in risk order, independent of inspection capacity.
+  function exportAllCSV(model, rows, threshold) {
+    const lines = [['risk_rank', 'engine_id', 'csv_row_number'].concat(model.features, DETAIL_HEAD).join(',')];
+    rows.forEach(function (r) {
+      lines.push([r.rank, r.id || '', r.rowNumber].concat(r.values, detailCells(model, r, threshold)).map(csvEscape).join(','));
+    });
+    return lines.join('\n') + '\n';
+  }
+
+  // Prioritised inspection list: the selected highest-risk flagged engines only.
+  function exportPriorityCSV(model, rows, threshold, capacity) {
+    const p = prioritize(rows, threshold, capacity);
+    const lines = [['inspection_priority', 'risk_rank', 'engine_id', 'csv_row_number'].concat(model.features, DETAIL_HEAD).join(',')];
+    p.selected.forEach(function (r, k) {
+      lines.push([k + 1, r.rank, r.id || '', r.rowNumber].concat(r.values, detailCells(model, r, threshold)).map(csvEscape).join(','));
     });
     return lines.join('\n') + '\n';
   }
@@ -558,7 +619,10 @@
     bestThreshold: bestThreshold, captureAt: captureAt, scorePercentile: scorePercentile,
     parseCSV: parseCSV, scoreCSV: scoreCSV, exportCSV: exportCSV, fleetAction: fleetAction,
     explainPrediction: explainPrediction, pickExamples: pickExamples, levelFor: levelFor, mainDriver: mainDriver, reviewFocus: reviewFocus,
-    outsideTraining: outsideTraining, MEANINGFUL: MEANINGFUL, withUnit: withUnit
+    outsideTraining: outsideTraining, MEANINGFUL: MEANINGFUL, withUnit: withUnit,
+    recommendation: recommendation, fleetSummary: fleetSummary, prioritize: prioritize,
+    exportAllCSV: exportAllCSV, exportPriorityCSV: exportPriorityCSV,
+    NEEDS_INSPECTION: NEEDS_INSPECTION, BELOW_THRESHOLD: BELOW_THRESHOLD
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.SmartOpsCore = api;

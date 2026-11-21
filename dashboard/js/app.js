@@ -40,7 +40,7 @@
   const oof = art.oof;
   const DEFAULTS = {threshold: 0.5, ratio: 1, unit: 100, capPct: 10};
   const RESULT_PLACEHOLDER = '<div class="panel"><h2>Result</h2><p class="muted">Pick a one-click example or enter readings, then press <strong>Analyze Engine</strong>. You will get the risk, the main reason, and what to check first.</p></div>';
-  const state = {threshold: DEFAULTS.threshold, ratio: DEFAULTS.ratio, unit: DEFAULTS.unit, capPct: DEFAULTS.capPct, fleet: null, capN: null, lastRow: null, detailsOpen: false};
+  const state = {threshold: DEFAULTS.threshold, ratio: DEFAULTS.ratio, unit: DEFAULTS.unit, capPct: DEFAULTS.capPct, fleet: null, capN: null, capErr: false, fleetLimit: 100, lastRow: null, detailsOpen: false};
 
   if (art.meta.fixture) {
     const b = $('banner');
@@ -286,21 +286,29 @@
     barChart($('chart-local'), items, {diverging: true, fmt: (v) => (v >= 0 ? '+' : '') + v.toFixed(2), aria: 'Contribution of each sensor reading to this engine\'s risk'});
   }
 
-  /* ---------- Fleet ---------- */
+    /* ---------- Fleet: predict every engine first, prioritise inspections only when needed ---------- */
+  const PAGE = 100, PRIO_LIMIT = 300;
+  const cardHtml = (x) => `<div class="card ${x.cls || ''}"><div class="k">${esc(x.k)}</div><div class="v">${esc(x.v)}</div><div class="s">${esc(x.s)}</div></div>`;
+  const engineLabel = (r) => r.id ? esc(r.id) : `<span class="muted">CSV row ${r.rowNumber}</span>`;
+  const probCell = (p) => `<td><strong>${pct(p, 1)}</strong><span class="pbar" aria-hidden="true"><i style="width:${Math.max(1, Math.round(p * 100))}%"></i></span></td>`;
+  const driverCell = (r) => r.driver ? `${esc(r.driver.name)} <small>▲ odds ${r.driver.oddsFactor > 1000 ? '>1,000' : r.driver.oddsFactor.toFixed(2)}×</small>` : '<span class="muted">No single driver</span>';
+  const rangeNote = (r) => r.outOfRange.length ? `<span class="tag m" title="${esc('Outside training range: ' + r.outOfRange.join(', '))}">Verify readings</span>` : '';
+
   function buildFleet() {
     $('req-cols').textContent = F.join(', ');
-    $('sample-note').textContent = '25 real rows from the held-out test set (labels removed), for trying the workflow.';
+    $('sample-note').textContent = '25 real rows from the held-out test set (labels removed), with sample Engine IDs, for trying the workflow.';
     const sampleCSV = () => {
       const rows = art.reference.X.slice(0, 25);
-      return F.join(',') + '\n' + rows.map((r) => r.map((v) => Number(v.toFixed(4))).join(',')).join('\n') + '\n';
+      return ['Engine ID'].concat(F).join(',') + '\n' + rows.map((r, i) => ['SAMPLE-' + String(i + 1).padStart(2, '0')].concat(r.map((v) => Number(v.toFixed(4)))).join(',')).join('\n') + '\n';
     };
     $('btn-sample').onclick = () => download('smartops_sample_fleet.csv', sampleCSV());
-    // Score CSV text and show the ranked list. Used for uploaded files and for the built-in sample.
+
+    // Parse, validate and score every row of the CSV text, then show all predictions.
     function loadFleetText(text, fromSample) {
       const msg = $('fleet-msg');
       const res = C.scoreCSV(model, text);
       if (res.error) {
-        state.fleet = null; $('fleet-out').hidden = true; $('cap').disabled = true;
+        state.fleet = null; $('fleet-out').hidden = true;
         msg.className = 'errors'; msg.hidden = false; msg.textContent = res.error;
         renderOverview();
         return;
@@ -308,15 +316,14 @@
       if (!res.rows.length) {
         state.fleet = null; $('fleet-out').hidden = true;
         msg.className = 'errors'; msg.hidden = false; msg.textContent = 'No valid rows found. First problem: ' + (res.invalid[0] ? 'row ' + res.invalid[0].rowNumber + ': ' + res.invalid[0].errors.join(' ') : 'file is empty.');
+        renderOverview();
         return;
       }
-      state.fleet = res;
+      state.fleet = res; state.fleetLimit = PAGE;
+      $('filter').value = 'all';
       const n = res.rows.length;
-      state.capN = Math.max(1, Math.ceil(n * 0.1));
-      $('cap').disabled = false; $('cap').max = n; $('cap').value = state.capN;
-      $('cap-hint').textContent = `Defaults to 10% of ${n.toLocaleString()} valid rows. Change it to match your workshop's capacity.`;
       msg.className = 'errors ok'; msg.hidden = false;
-      msg.textContent = (fromSample ? 'Sample loaded. ' : '') + `Scored ${n.toLocaleString()} valid rows` + (res.invalid.length ? `; skipped ${res.invalid.length.toLocaleString()} invalid rows` : '') + (res.extraColumns.length ? `; ignored extra columns: ${res.extraColumns.join(', ')}` : '') + '.';
+      msg.textContent = (fromSample ? 'Sample loaded. ' : '') + `Analyzed all ${n.toLocaleString()} valid engine(s)` + (res.invalid.length ? `; ${res.invalid.length.toLocaleString()} row(s) could not be analyzed (details below the table)` : '') + (res.idColumn ? `; Engine IDs read from "${res.idColumn}"` : '') + (res.extraColumns.length ? `; ignored other columns: ${res.extraColumns.join(', ')}` : '') + '.';
       renderFleet(); renderOverview();
       if (fromSample) $('fleet-out').scrollIntoView({block: 'start'});
     }
@@ -331,16 +338,26 @@
       reader.onload = () => loadFleetText(String(reader.result), false);
       reader.readAsText(file);
     });
+    $('filter').addEventListener('change', () => { state.fleetLimit = PAGE; renderFleet(); });
+    $('btn-more').onclick = () => { state.fleetLimit += PAGE; renderFleet(); };
+    $('btn-all').onclick = () => { state.fleetLimit = Infinity; renderFleet(); };
     $('cap').addEventListener('input', (e) => {
-      const n = state.fleet ? state.fleet.rows.length : 1;
-      const v = Math.floor(Number(e.target.value));
-      state.capN = Number.isFinite(v) && v >= 1 ? Math.min(v, n) : 1;
-      renderFleet();
+      const raw = e.target.value.trim();
+      state.capErr = false;
+      if (raw === '') state.capN = null;
+      else {
+        const v = Number(raw);
+        if (Number.isInteger(v) && v >= 1) state.capN = v; else { state.capN = null; state.capErr = true; }
+      }
+      renderPrioritize();
     });
-    $('filter').addEventListener('change', renderFleet);
-    $('btn-export').onclick = () => {
+    $('btn-export-all').onclick = () => {
       if (!state.fleet) return;
-      download('smartops_ranked_inspection_list.csv', C.exportCSV(model, state.fleet.rows, state.threshold, state.capN));
+      download('smartops_all_predictions.csv', C.exportAllCSV(model, state.fleet.rows, state.threshold));
+    };
+    $('btn-export-prio').onclick = () => {
+      if (!state.fleet || state.capN === null) return;
+      download('smartops_prioritized_inspections.csv', C.exportPriorityCSV(model, state.fleet.rows, state.threshold, state.capN));
     };
   }
 
@@ -348,40 +365,70 @@
     const fl = state.fleet;
     if (!fl) return;
     $('fleet-out').hidden = false;
-    const thr = state.threshold, cap = state.capN;
-    const rows = fl.rows;
-    const above = rows.filter((r) => r.risk >= thr);
-    const inspect = rows.filter((r) => r.risk >= thr && r.rank <= cap);
-    const capPct = Math.min(100, Math.max(1, Math.round((cap / rows.length) * 100)));
-    const cp = C.captureAt(art.capture, oof, capPct);
+    const thr = state.threshold, rows = fl.rows;
+    const S = C.fleetSummary(rows, thr);
     $('fleet-cards').innerHTML = [
-      {k: 'Valid rows scored', v: rows.length.toLocaleString(), s: fl.invalid.length ? `${fl.invalid.length} invalid rows skipped.` : 'No invalid rows.'},
-      {k: `At or above threshold ${f2(thr)}`, v: above.length.toLocaleString(), s: pct(above.length / rows.length, 1) + ' of valid rows.'},
-      {k: 'Recommended for inspection now', v: inspect.length.toLocaleString(), s: `Above threshold and within your capacity of ${cap.toLocaleString()}.`, cls: 'accent'},
-      {k: `Evidence for the top ${capPct}%`, v: pct(cp.precision), s: `In development data the top ${capPct}% by risk carried the label this often (${pct(cp.randomPrecision)} by chance) and found ${pct(cp.recall)} of all cases.`}
-    ].concat(rows.some((r) => r.outOfRange.length) ? [{k: 'Rows with readings outside the training range', v: rows.filter((r) => r.outOfRange.length).length.toLocaleString(), s: 'The model extrapolates for these rows. Verify the readings; do not treat a low score as routine.', cls: 'warn'}] : []).map((x) => `<div class="card ${x.cls || ''}"><div class="k">${esc(x.k)}</div><div class="v">${esc(x.v)}</div><div class="s">${esc(x.s)}</div></div>`).join('');
+      {k: 'Total Engines Analyzed', v: S.total.toLocaleString(), s: fl.invalid.length ? `${fl.invalid.length.toLocaleString()} row(s) could not be analyzed.` : 'Every valid row was scored by the model.'},
+      {k: C.NEEDS_INSPECTION, v: S.needs.toLocaleString(), s: `Predicted probability at or above ${f2(thr)}.`, cls: 'accent'},
+      {k: C.BELOW_THRESHOLD, v: S.below.toLocaleString(), s: 'Probability below the threshold. This is not a guarantee of good condition.'},
+      {k: 'Percentage Flagged for Inspection', v: pct(S.pctFlagged, 1), s: `${S.needs.toLocaleString()} of ${S.total.toLocaleString()} engines.`}
+    ].concat(S.outOfRange ? [{k: 'Engines with readings outside the training range', v: S.outOfRange.toLocaleString(), s: 'The model extrapolates for these engines. Verify the readings before relying on the score.', cls: 'warn'}] : []).map(cardHtml).join('');
+    const sb = $('fleet-stack');
+    sb.setAttribute('aria-label', `${S.needs} of ${S.total} engines need inspection, ${S.below} are below the threshold`);
+    sb.innerHTML = `<span class="s-need" style="width:${(S.pctFlagged * 100).toFixed(2)}%"></span><span class="s-below" style="width:${((1 - S.pctFlagged) * 100).toFixed(2)}%"></span>`;
+    $('id-note').textContent = fl.idColumn ? `Engine IDs come from the "${fl.idColumn}" column.` : 'No Engine ID column was found, so engines are identified by their CSV row number (the header is row 1).';
 
     const mode = $('filter').value;
-    let shown = rows;
-    if (mode === 'above') shown = above; else if (mode === 'inspect') shown = inspect;
-    const LIMIT = 200;
-    const head = `<thead><tr><th>Rank</th><th>CSV row</th>${F.map((f, i) => `<th>${esc(f)}<br><small>${esc(U[i])}</small></th>`).join('')}<th>Risk</th><th class="l">Main model driver</th><th class="l">Status</th></tr></thead>`;
-    const body = shown.slice(0, LIMIT).map((r) => {
-      const isAbove = r.risk >= thr, within = r.rank <= cap;
-      const oor = r.outOfRange.length > 0;
-      const tag = isAbove && within ? '<span class="tag y">Inspect</span>' : isAbove ? '<span class="tag m">Above threshold, over capacity</span>' : oor ? '<span class="tag m">Verify readings first</span>' : '<span class="tag n">Routine</span>';
-      const warnTag = oor && isAbove ? ' <span class="tag m" title="' + esc('Outside training range: ' + r.outOfRange.join(', ')) + '">Check readings</span>' : '';
-      const drv = r.driver ? `${esc(r.driver.name)} <small>▲ odds ${r.driver.oddsFactor > 1000 ? '>1,000' : r.driver.oddsFactor.toFixed(2)}×</small>` : '<span class="muted">No single driver</span>';
-      return `<tr class="${isAbove && within ? 'flag' : ''}"><td>${r.rank}</td><td>${r.rowNumber}</td>${r.values.map((v) => `<td>${Number(v.toFixed(2))}</td>`).join('')}<td><strong>${pct(r.risk, 1)}</strong></td><td class="l">${drv}</td><td class="l">${tag}${warnTag}</td></tr>`;
+    const shown = mode === 'above' ? rows.filter((r) => r.risk >= thr) : mode === 'below' ? rows.filter((r) => r.risk < thr) : rows;
+    const visible = shown.slice(0, state.fleetLimit);
+    const head = '<thead><tr><th>Risk rank</th><th class="l">Engine</th><th>Predicted probability</th><th class="l">Inspection recommendation</th><th class="l">Main model driver</th><th class="l">Notes</th></tr></thead>';
+    const body = visible.map((r) => {
+      const needs = r.risk >= thr;
+      const tag = needs ? `<span class="tag y">${C.NEEDS_INSPECTION}</span>` : `<span class="tag g">${C.BELOW_THRESHOLD}</span>`;
+      return `<tr class="${needs ? 'flag' : ''}"><td>${r.rank}</td><td class="l">${engineLabel(r)}</td>${probCell(r.risk)}<td class="l">${tag}</td><td class="l">${driverCell(r)}</td><td class="l">${rangeNote(r)}</td></tr>`;
     }).join('');
-    $('fleet-table').innerHTML = `<caption class="sr">Engines ranked by predicted maintenance risk</caption>${head}<tbody>${body || `<tr><td colspan="${F.length + 5}" class="l">No rows match this filter.</td></tr>`}</tbody>`;
-    $('fleet-more').textContent = shown.length > LIMIT ? `Showing the top ${LIMIT} of ${shown.length.toLocaleString()} rows. The exported CSV contains every valid row.` : '';
+    $('fleet-table').innerHTML = `<caption class="sr">Predicted maintenance probability for every analyzed engine, highest first</caption>${head}<tbody>${body || '<tr><td colspan="6" class="l">No engines match this filter.</td></tr>'}</tbody>`;
+    $('fleet-more').textContent = `Showing ${visible.length.toLocaleString()} of ${shown.length.toLocaleString()} engine(s). The exported CSV always contains every analyzed engine.`;
+    $('btn-more').hidden = shown.length <= visible.length;
+    $('btn-all').hidden = shown.length <= visible.length;
+    $('btn-more').textContent = `Show ${Math.min(PAGE, shown.length - visible.length).toLocaleString()} more`;
+    $('btn-all').textContent = `Show all ${shown.length.toLocaleString()}`;
     const box = $('invalid-box');
     box.hidden = fl.invalid.length === 0;
     if (fl.invalid.length) {
-      $('invalid-sum').textContent = `${fl.invalid.length} invalid row(s) skipped`;
+      $('invalid-sum').textContent = `${fl.invalid.length} row(s) could not be analyzed and were skipped. The other rows were analyzed normally.`;
       $('invalid-list').innerHTML = fl.invalid.slice(0, 50).map((x) => `<li>Row ${x.rowNumber}: ${esc(x.errors.join(' '))}</li>`).join('') + (fl.invalid.length > 50 ? `<li>…and ${fl.invalid.length - 50} more.</li>` : '');
     }
+    renderPrioritize();
+  }
+
+  // Optional business step. Uses the scores as they are; capacity never changes a prediction.
+  function renderPrioritize() {
+    const fl = state.fleet;
+    if (!fl) return;
+    const hint = $('cap-hint'), out = $('prio-out');
+    const P = C.prioritize(fl.rows, state.threshold, state.capN === null ? NaN : state.capN);
+    if (state.capErr) { hint.textContent = 'Enter a whole number of 1 or more, or leave this empty to skip this step.'; out.hidden = true; return; }
+    if (state.capN === null) { hint.textContent = `Optional. ${P.flagged.toLocaleString()} engine(s) are currently marked Needs Inspection. Leave empty to skip.`; out.hidden = true; return; }
+    out.hidden = false;
+    if (!P.flagged) {
+      hint.textContent = 'No engine is marked Needs Inspection at this threshold, so there is nothing to prioritize. Lower the threshold to flag more engines.';
+      $('prio-cards').innerHTML = ''; $('prio-table').innerHTML = ''; $('prio-more').textContent = ''; $('btn-export-prio').disabled = true;
+      return;
+    }
+    $('btn-export-prio').disabled = false;
+    hint.textContent = P.spare ? `Your capacity covers all ${P.flagged.toLocaleString()} flagged engine(s), with ${P.spare.toLocaleString()} spare slot(s).` : `Inspect the ${P.selected.length.toLocaleString()} highest-risk flagged engine(s) first.`;
+    $('prio-cards').innerHTML = [
+      {k: 'Engines Flagged for Inspection', v: P.flagged.toLocaleString(), s: `Out of ${fl.rows.length.toLocaleString()} analyzed.`},
+      {k: 'Available Inspection Capacity', v: P.capacity.toLocaleString(), s: 'Entered by you.'},
+      {k: 'Inspect First', v: P.selected.length.toLocaleString(), s: 'Highest predicted probability among the flagged engines.', cls: 'accent'},
+      {k: 'Flagged, outside current capacity', v: P.outside.toLocaleString(), s: P.outside ? 'Still Needs Inspection. Schedule them next; they are not cleared as safe.' : 'No flagged engine is left outside your capacity.'}
+    ].map(cardHtml).join('');
+    const head = '<thead><tr><th>Priority</th><th>Risk rank</th><th class="l">Engine</th><th>Predicted probability</th><th class="l">Main model driver</th><th class="l">Suggested first check</th><th class="l">Notes</th></tr></thead>';
+    const body = P.selected.slice(0, PRIO_LIMIT).map((r, k) =>
+      `<tr class="flag"><td>${k + 1}</td><td>${r.rank}</td><td class="l">${engineLabel(r)}</td>${probCell(r.risk)}<td class="l">${driverCell(r)}</td><td class="l wrap">${esc(C.reviewFocus(r.driver))}</td><td class="l">${rangeNote(r)}</td></tr>`).join('');
+    $('prio-table').innerHTML = `<caption class="sr">Highest-risk flagged engines selected for inspection within the entered capacity</caption>${head}<tbody>${body}</tbody>`;
+    $('prio-more').textContent = P.selected.length > PRIO_LIMIT ? `Showing the first ${PRIO_LIMIT} of ${P.selected.length.toLocaleString()}. The exported list contains all of them.` : 'Predictions above are unchanged. Capacity only sets the order of inspection.';
   }
 
   function download(name, text) {
@@ -511,7 +558,7 @@
 
   /* ---------- reset demo ---------- */
   function resetDemo() {
-    Object.assign(state, {threshold: DEFAULTS.threshold, ratio: DEFAULTS.ratio, unit: DEFAULTS.unit, capPct: DEFAULTS.capPct, fleet: null, capN: null, lastRow: null, detailsOpen: false});
+    Object.assign(state, {threshold: DEFAULTS.threshold, ratio: DEFAULTS.ratio, unit: DEFAULTS.unit, capPct: DEFAULTS.capPct, fleet: null, capN: null, capErr: false, fleetLimit: 100, lastRow: null, detailsOpen: false});
     // Predict
     F.forEach((f, i) => { const e = $('in-' + i); e.value = ''; e.removeAttribute('aria-invalid'); });
     $('form-errors').hidden = true;
@@ -519,8 +566,8 @@
     // Fleet
     $('csv').value = '';
     $('fleet-msg').hidden = true; $('fleet-out').hidden = true;
-    $('cap').value = ''; $('cap').disabled = true; $('cap-hint').textContent = 'Upload a file first.';
-    $('filter').value = 'inspect';
+    $('cap').value = ''; $('cap-hint').textContent = ''; $('prio-out').hidden = true;
+    $('filter').value = 'all';
     // Shared settings and Business assumptions
     ['thr-fleet', 'thr-biz', 'thr-pred'].forEach((id) => { $(id).value = DEFAULTS.threshold; });
     ['thr-fleet-out', 'thr-biz-out', 'thr-pred-out'].forEach((id) => { $(id).textContent = f2(DEFAULTS.threshold); });

@@ -140,7 +140,7 @@ test('demo controls exist: three examples built from the model, a Reset demo but
   assert.ok(app.includes('C.pickExamples(model, realRows, DEFAULTS.threshold)'));
   assert.ok(!/model says \d/.test(app), 'example buttons must not carry hardcoded risk numbers');
   const reset = app.slice(app.indexOf('function resetDemo'), app.indexOf('/* ---------- start'));
-  ['threshold: DEFAULTS.threshold', 'ratio: DEFAULTS.ratio', 'unit: DEFAULTS.unit', 'capPct: DEFAULTS.capPct', 'fleet: null', 'lastRow: null', "$('csv').value = ''", "$('filter').value = 'inspect'", "$('curve-sensor').value = '0'", 'RESULT_PLACEHOLDER']
+  ['threshold: DEFAULTS.threshold', 'ratio: DEFAULTS.ratio', 'unit: DEFAULTS.unit', 'capPct: DEFAULTS.capPct', 'fleet: null', 'lastRow: null', "$('csv').value = ''", "$('filter').value = 'all'", "$('cap').value = ''", 'capN: null', "$('curve-sensor').value = '0'", 'RESULT_PLACEHOLDER']
     .forEach((x) => assert.ok(reset.includes(x), 'reset must handle ' + x));
   assert.deepEqual(app.match(/const DEFAULTS = \{[^}]+\}/)[0], 'const DEFAULTS = {threshold: 0.5, ratio: 1, unit: 100, capPct: 10}');
 });

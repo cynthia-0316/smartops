@@ -188,3 +188,28 @@ details.more[open]>summary::before{content:"▾ ";}
 details.more[open]>summary{margin-bottom:14px}
 @media (max-width:520px){.g-list div{grid-template-columns:1fr;gap:2px}.g-top .num{font-size:46px}.top-in #btn-reset{margin-left:0}}
 @media (max-width:520px){.btn.small{min-height:44px}}
+
+/* ---------- Fleet page: AI prediction vs optional business step ---------- */
+.steps-flow{list-style:none;display:flex;flex-wrap:wrap;gap:6px 8px;margin:0 0 16px;padding:0;counter-reset:fl}
+.steps-flow li{counter-increment:fl;font-size:13px;font-weight:600;color:var(--muted);background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:4px 12px}
+.steps-flow li::before{content:counter(fl) ". ";color:var(--blue)}
+.zone{border-radius:var(--radius);padding:18px 18px 4px;margin:0 0 22px}
+.zone.ai{background:#f3f7ff;border:1px solid #c9d8f8}
+.zone.biz{background:#fffaf0;border:1px dashed #e4c98f}
+.zone > h2{margin:2px 0 4px}
+.zone-tag{display:inline-block;margin:0;font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;border-radius:99px;padding:2px 10px}
+.zone.ai .zone-tag{background:var(--blue-soft);color:var(--blue-ink)}
+.zone.biz .zone-tag{background:var(--amber-soft);color:var(--amber)}
+.zone .panel{margin-bottom:18px}
+.zone .cards{margin:12px 0}
+.stackbar{display:flex;height:14px;border-radius:99px;overflow:hidden;background:#e3e8f2;margin:0 0 16px}
+.stackbar .s-need{background:var(--red);min-width:0}
+.stackbar .s-below{background:#9aa6bd;min-width:0}
+.tag.g{background:#e9edf4;color:#3f4d66}
+.pbar{display:inline-block;vertical-align:middle;width:56px;height:6px;margin-left:8px;border-radius:99px;background:#e3e8f2;overflow:hidden}
+.pbar i{display:block;height:100%;background:var(--blue)}
+.field.inline{flex-direction:row;align-items:center;gap:10px;margin:0}
+.field.inline select{width:auto;min-width:220px}
+.pager{margin:12px 0 4px}
+.zone h3{margin:6px 0 10px;font-size:17px}
+@media (max-width:520px){.field.inline{width:100%;flex-direction:column;align-items:stretch}.field.inline select{width:100%;min-width:0}.zone{padding:14px 12px 2px}.pbar{display:none}}

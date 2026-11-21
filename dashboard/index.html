@@ -159,16 +159,19 @@
 
 <!-- ============ FLEET ============ -->
 <section id="fleet" class="tab" aria-labelledby="h-fleet" hidden>
-  <h1 id="h-fleet">Fleet inspection priorities</h1>
-  <p class="lead">Upload a CSV with the six sensor columns. Every valid row is scored with the same model, ranked by risk, and can be exported as an inspection list.</p>
+  <h1 id="h-fleet">Fleet maintenance prediction</h1>
+  <p class="lead">Upload a CSV with the six sensor columns. SmartOps analyzes <strong>every valid engine</strong> with the trained model and shows which engines are recommended for inspection. Inspection capacity is an optional extra further down the page.</p>
+  <ol class="steps-flow" aria-label="Workflow">
+    <li>Upload CSV</li><li>Analyze all engines</li><li>View predictions</li><li>Optional: prioritize inspections</li><li>Export results</li>
+  </ol>
   <div class="two wide-left">
     <div class="panel">
-      <h2>1. Upload</h2>
+      <h2>1. Upload your fleet</h2>
       <label class="file" for="csv">
         <span>Choose a CSV file</span>
         <input id="csv" type="file" accept=".csv,text/csv,text/plain">
       </label>
-      <p class="hint">Required columns (any order, extra columns ignored): <code id="req-cols"></code></p>
+      <p class="hint">Required columns (any order): <code id="req-cols"></code>. An optional <code>Engine ID</code> column is kept in the results; other columns are ignored. Every valid row is analyzed as soon as the file is loaded.</p>
       <p class="hint">No file handy? Try the demo with sample engines:</p>
       <div class="row">
         <button class="btn primary" id="btn-sample-load" type="button">Try with 25 sample engines</button>
@@ -178,40 +181,65 @@
       <div id="fleet-msg" class="errors" role="alert" hidden></div>
     </div>
     <div class="panel">
-      <h2>2. Decide how many to inspect</h2>
-      <div class="field">
-        <label for="cap">Engines your team can inspect now</label>
-        <input id="cap" type="number" min="1" step="1" inputmode="numeric" disabled>
-        <span class="hint" id="cap-hint">Upload a file first.</span>
-      </div>
+      <h2>2. Inspection threshold</h2>
       <div class="field">
         <label for="thr-fleet">Risk threshold <output id="thr-fleet-out"></output></label>
         <input id="thr-fleet" type="range" min="0.05" max="0.95" step="0.01">
-        <span class="hint">Engines at or above the threshold are flagged. This is a business choice, not an engineering safety limit.</span>
+        <span class="hint">Engines at or above the threshold are marked <strong>Needs Inspection</strong>. This is a business choice, not an engineering safety limit.</span>
       </div>
-      <div class="field">
-        <label for="filter">Show</label>
-        <select id="filter">
-          <option value="inspect">Recommended for inspection (above threshold and within capacity)</option>
-          <option value="above">All above threshold</option>
-          <option value="all">All valid rows</option>
-        </select>
-      </div>
+      <p class="hint">Moving the slider re-classifies every engine instantly. The predicted probabilities themselves never change.</p>
     </div>
   </div>
 
   <div id="fleet-out" hidden>
-    <div class="cards" id="fleet-cards" aria-live="polite"></div>
-    <div class="panel">
-      <div class="row between">
-        <h2>3. Ranked list</h2>
-        <button class="btn primary" id="btn-export" type="button">Export ranked inspection list (CSV)</button>
+    <section class="zone ai" aria-labelledby="h-pred">
+      <p class="zone-tag">AI prediction</p>
+      <h2 id="h-pred">Prediction results for all engines</h2>
+      <div class="cards" id="fleet-cards" aria-live="polite"></div>
+      <div class="stackbar" id="fleet-stack" role="img" aria-label="Share of engines flagged for inspection"></div>
+      <div class="panel">
+        <div class="row between">
+          <div class="field inline">
+            <label for="filter">Show</label>
+            <select id="filter">
+              <option value="all">All Engines</option>
+              <option value="above">Needs Inspection</option>
+              <option value="below">Below Inspection Threshold</option>
+            </select>
+          </div>
+          <button class="btn primary" id="btn-export-all" type="button">Export all predictions (CSV)</button>
+        </div>
+        <p class="hint" id="id-note"></p>
+        <div class="table-wrap"><table id="fleet-table"><caption class="sr">Predicted maintenance probability for every analyzed engine, highest first</caption></table></div>
+        <div class="row pager" id="pager">
+          <button class="btn small" id="btn-more" type="button" hidden>Show 100 more</button>
+          <button class="btn small" id="btn-all" type="button" hidden>Show all</button>
+          <span class="hint" id="fleet-more"></span>
+        </div>
+        <details id="invalid-box" hidden><summary id="invalid-sum"></summary><ul id="invalid-list"></ul></details>
+        <p class="hint">The model is decision support, not a mechanical diagnosis. An engine below the threshold is not certified healthy or safe: keep routine inspections, and verify any engine whose readings are outside the training range.</p>
       </div>
-      <p class="hint">Rows are identified by their <strong>CSV row number</strong> (the header is row 1). The uploaded file had no engine IDs that SmartOps could rely on, so none are invented.</p>
-      <div class="table-wrap"><table id="fleet-table"><caption class="sr">Engines ranked by predicted maintenance risk</caption></table></div>
-      <p class="hint" id="fleet-more"></p>
-      <details id="invalid-box" hidden><summary id="invalid-sum"></summary><ul id="invalid-list"></ul></details>
-    </div>
+    </section>
+
+    <section class="zone biz" aria-labelledby="h-prio">
+      <p class="zone-tag">Business decision · optional</p>
+      <h2 id="h-prio">Optional: Prioritize Inspections</h2>
+      <p class="muted">For teams with limited maintenance resources. Enter how many engines you can inspect now and SmartOps lists the highest-risk flagged engines first. Capacity only sets the inspection order; it never changes a prediction. You can skip this section.</p>
+      <div class="field">
+        <label for="cap">Engines your team can inspect now</label>
+        <input id="cap" type="number" min="1" step="1" inputmode="numeric" placeholder="e.g. 30">
+        <span class="hint" id="cap-hint"></span>
+      </div>
+      <div id="prio-out" hidden>
+        <div class="cards" id="prio-cards" aria-live="polite"></div>
+        <div class="row between">
+          <h3>Inspect these first</h3>
+          <button class="btn primary" id="btn-export-prio" type="button">Export prioritized list (CSV)</button>
+        </div>
+        <div class="table-wrap"><table id="prio-table"><caption class="sr">Highest-risk flagged engines selected for inspection within the entered capacity</caption></table></div>
+        <p class="hint" id="prio-more"></p>
+      </div>
+    </section>
   </div>
 </section>
 
