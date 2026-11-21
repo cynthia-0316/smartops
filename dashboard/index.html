@@ -137,13 +137,13 @@
   <p class="lead">Enter the six readings. The model returns the predicted probability of the <em>Needs Maintenance</em> label and compares it with your inspection threshold.</p>
   <form id="form" class="panel" novalidate>
     <h2>Sensor readings</h2>
+    <div class="examples"><span class="ex-label">Start here: try an example, or enter your own readings below</span><div id="examples" class="row"></div></div>
     <div id="fields" class="fields three"></div>
     <div class="field">
       <label for="thr-pred">Inspection threshold <output id="thr-pred-out"></output></label>
       <input id="thr-pred" type="range" min="0.05" max="0.95" step="0.01">
       <span class="hint">Risk categories depend on this configurable business threshold. They are not engineering safety limits.</span>
     </div>
-    <div class="examples"><span class="ex-label">One-click examples</span><div id="examples" class="row"></div></div>
     <div class="row">
       <button type="submit" class="btn primary">Analyze Engine</button>
       <button type="reset" class="btn ghost" id="btn-clear">Clear</button>
@@ -169,7 +169,11 @@
         <input id="csv" type="file" accept=".csv,text/csv,text/plain">
       </label>
       <p class="hint">Required columns (any order, extra columns ignored): <code id="req-cols"></code></p>
-      <button class="btn" id="btn-sample" type="button">Download a sample CSV</button>
+      <p class="hint">No file handy? Try the demo with sample engines:</p>
+      <div class="row">
+        <button class="btn primary" id="btn-sample-load" type="button">Try with 25 sample engines</button>
+        <button class="btn" id="btn-sample" type="button">Download the sample CSV</button>
+      </div>
       <p class="hint" id="sample-note"></p>
       <div id="fleet-msg" class="errors" role="alert" hidden></div>
     </div>

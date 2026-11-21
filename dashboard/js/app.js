@@ -29,7 +29,7 @@
     b.className = 'banner err'; b.hidden = false;
     b.textContent = 'Model file not found. Run notebooks/dashboard_model_export.ipynb in Google Colab and copy model_data.js and model.json into dashboard/model/ (see dashboard/README.md).';
     $('ov-cards').innerHTML = '<div class="card"><div class="k">Model</div><div class="v">Not loaded</div><div class="s">No predictions are available until the trained model is exported.</div></div>';
-    document.querySelectorAll('#form button[type=submit], #csv, #btn-sample, #btn-reset').forEach((e) => { e.disabled = true; });
+    document.querySelectorAll('#form button[type=submit], #csv, #btn-sample, #btn-sample-load, #btn-reset').forEach((e) => { e.disabled = true; });
     return;
   }
 
@@ -290,11 +290,37 @@
   function buildFleet() {
     $('req-cols').textContent = F.join(', ');
     $('sample-note').textContent = '25 real rows from the held-out test set (labels removed), for trying the workflow.';
-    $('btn-sample').onclick = () => {
+    const sampleCSV = () => {
       const rows = art.reference.X.slice(0, 25);
-      const text = F.join(',') + '\n' + rows.map((r) => r.map((v) => Number(v.toFixed(4))).join(',')).join('\n') + '\n';
-      download('smartops_sample_fleet.csv', text);
+      return F.join(',') + '\n' + rows.map((r) => r.map((v) => Number(v.toFixed(4))).join(',')).join('\n') + '\n';
     };
+    $('btn-sample').onclick = () => download('smartops_sample_fleet.csv', sampleCSV());
+    // Score CSV text and show the ranked list. Used for uploaded files and for the built-in sample.
+    function loadFleetText(text, fromSample) {
+      const msg = $('fleet-msg');
+      const res = C.scoreCSV(model, text);
+      if (res.error) {
+        state.fleet = null; $('fleet-out').hidden = true; $('cap').disabled = true;
+        msg.className = 'errors'; msg.hidden = false; msg.textContent = res.error;
+        renderOverview();
+        return;
+      }
+      if (!res.rows.length) {
+        state.fleet = null; $('fleet-out').hidden = true;
+        msg.className = 'errors'; msg.hidden = false; msg.textContent = 'No valid rows found. First problem: ' + (res.invalid[0] ? 'row ' + res.invalid[0].rowNumber + ': ' + res.invalid[0].errors.join(' ') : 'file is empty.');
+        return;
+      }
+      state.fleet = res;
+      const n = res.rows.length;
+      state.capN = Math.max(1, Math.ceil(n * 0.1));
+      $('cap').disabled = false; $('cap').max = n; $('cap').value = state.capN;
+      $('cap-hint').textContent = `Defaults to 10% of ${n.toLocaleString()} valid rows. Change it to match your workshop's capacity.`;
+      msg.className = 'errors ok'; msg.hidden = false;
+      msg.textContent = (fromSample ? 'Sample loaded. ' : '') + `Scored ${n.toLocaleString()} valid rows` + (res.invalid.length ? `; skipped ${res.invalid.length.toLocaleString()} invalid rows` : '') + (res.extraColumns.length ? `; ignored extra columns: ${res.extraColumns.join(', ')}` : '') + '.';
+      renderFleet(); renderOverview();
+      if (fromSample) $('fleet-out').scrollIntoView({block: 'start'});
+    }
+    $('btn-sample-load').onclick = () => loadFleetText(sampleCSV(), true);
     $('csv').addEventListener('change', (e) => {
       const file = e.target.files[0];
       if (!file) return;
@@ -302,28 +328,7 @@
       msg.hidden = true;
       const reader = new FileReader();
       reader.onerror = () => { msg.className = 'errors'; msg.hidden = false; msg.textContent = 'The file could not be read.'; };
-      reader.onload = () => {
-        const res = C.scoreCSV(model, String(reader.result));
-        if (res.error) {
-          state.fleet = null; $('fleet-out').hidden = true; $('cap').disabled = true;
-          msg.className = 'errors'; msg.hidden = false; msg.textContent = res.error;
-          renderOverview();
-          return;
-        }
-        if (!res.rows.length) {
-          state.fleet = null; $('fleet-out').hidden = true;
-          msg.className = 'errors'; msg.hidden = false; msg.textContent = 'No valid rows found. First problem: ' + (res.invalid[0] ? 'row ' + res.invalid[0].rowNumber + ': ' + res.invalid[0].errors.join(' ') : 'file is empty.');
-          return;
-        }
-        state.fleet = res;
-        const n = res.rows.length;
-        state.capN = Math.max(1, Math.ceil(n * 0.1));
-        $('cap').disabled = false; $('cap').max = n; $('cap').value = state.capN;
-        $('cap-hint').textContent = `Defaults to 10% of ${n.toLocaleString()} valid rows. Change it to match your workshop's capacity.`;
-        msg.className = 'errors ok'; msg.hidden = false;
-        msg.textContent = `Scored ${n.toLocaleString()} valid rows` + (res.invalid.length ? `; skipped ${res.invalid.length.toLocaleString()} invalid rows` : '') + (res.extraColumns.length ? `; ignored extra columns: ${res.extraColumns.join(', ')}` : '') + '.';
-        renderFleet(); renderOverview();
-      };
+      reader.onload = () => loadFleetText(String(reader.result), false);
       reader.readAsText(file);
     });
     $('cap').addEventListener('input', (e) => {
