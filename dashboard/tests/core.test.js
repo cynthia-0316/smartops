@@ -196,9 +196,10 @@ test('real model: contributions add up to the log-odds', {skip}, () => {
 test('real model: saved metrics match the project evaluation', {skip}, () => {
   const t = real.metrics.test, cv = real.metrics.cv;
   assert.equal(real.meta.n_dev, 16604); assert.equal(t.n, 2931);
-  close(t.auc, 0.7099, 0.0006, 'test AUC (project report: 0.7099)');
+  close(t.auc, 0.7095, 0.0006, 'test AUC (project analysis, GAM: 0.7095)');
   assert.ok(t.auc_ci[0] > 0.68 && t.auc_ci[1] < 0.74);
-  close(cv.auc_mean, 0.7026, 0.004, 'CV AUC (project report: about 0.703)');
+  close(cv.auc_mean, 0.7041, 0.001, 'CV AUC (project analysis, GAM: 0.7041)');
+  assert.ok(Number.isFinite(cv.auc_std) && Number.isFinite(cv.brier_mean), 'cross-validation metrics must be finite');
   assert.equal(cv.n_folds, 15);
   assert.match(real.meta.trained_on, /train \+ val only/);
 });

@@ -16,17 +16,17 @@ and open http://localhost:8080, or just open `dashboard/index.html` in a browser
 
 ## The model
 
-**Spline logistic regression** (6 quantile knots per sensor, cubic B-splines, linear extrapolation, standardised, L2 logistic regression with `C = 0.03`), fitted on the **development data only** (train + val, 16,604 rows). The 2,931-row test set is scored once, for reporting.
+**Penalised logistic GAM** (pyGAM `LogisticGAM`, one cubic P-spline term with 20 splines per sensor, smoothing chosen by a lambda grid, linear extrapolation outside the training range), fitted on the **development data only** (train + val, 16,604 rows). The 2,931-row test set is scored once, for reporting. It is the same GAM as in `notebooks/SmartOps_Final_Colab_Analysis.ipynb` (CV AUC 0.7041, test AUC 0.7095).
 
 It is an additive model: the six sensor effects add up exactly to the log-odds. That is why the dashboard can show an exact per-engine explanation without SHAP.
 
-Why not the penalised GAM (20 splines) that the report names as its recommendation? On the test set the two are equivalent (AUC 0.7095 vs 0.7099, difference -0.0004 with 95% CI -0.002 to +0.001, see `experiments/RESULTS.md`). The spline logistic regression is a linear model on spline features, so it reproduces exactly in a browser from 48 coefficients plus the knots. A GAM would need the `pygam` library and a Python server. This is a deployment choice, not a claim that it is more accurate.
+A GAM stores, per sensor, a knot vector and 20 coefficients, so the browser can reproduce it exactly from 120 coefficients plus the knots; no Python server is needed. The spline logistic regression used in an earlier version of this dashboard scores the same on the test set (AUC 0.7099 vs 0.7095, difference not significant), so the choice between them is about consistency with the final report, not accuracy.
 
 ## How inference works (and how we know it is the real model)
 
-1. `notebooks/dashboard_model_export.ipynb` (Colab) trains the model, scores the test set once, computes cross-validated metrics and out-of-fold decision tables, and exports the fitted knots, scaler and coefficients to `model/model.json` and `model/model_data.js`.
-2. The notebook re-computes 256 reference probabilities from the exported numbers only and asserts they match scikit-learn (`< 1e-8`).
-3. `js/core.js` re-implements the spline basis, scaling and logistic function. `tests/core.test.js` checks it against the same reference rows (`npm test` in this folder, or `node --test dashboard/tests/core.test.js`). The Model Insights page repeats this check in the browser.
+1. `notebooks/dashboard_model_export_gam.ipynb` (Colab) trains the GAM, scores the test set once, computes cross-validated metrics and out-of-fold decision tables, and exports the knots, coefficients and basis means to `model/model.json` and `model/model_data.js`.
+2. The notebook re-computes 394 reference probabilities (250 real test rows plus 144 edge cases, 26 of them outside the training range) from the exported numbers only and asserts they match pyGAM (`< 1e-8`) before it runs the slow steps.
+3. `js/core.js` re-implements the spline basis and logistic function. `tests/core.test.js` checks it against the same reference rows (`npm test` in this folder, or `node --test dashboard/tests/core.test.js`). The Model Insights page repeats this check in the browser.
 4. All metrics shown (test AUC, cross-validation AUC, threshold and cost tables) are read from the exported file. Nothing is simulated or typed in by hand.
 
 ## Predict page: explanations and recommendations
@@ -69,7 +69,7 @@ Nothing has been deployed publicly. Deploying needs team approval.
 node --test dashboard/tests/core.test.js dashboard/tests/explain.test.js dashboard/tests/demo.test.js
 ```
 
-Covers the spline maths (partition of unity, linear extrapolation), input validation, CSV parsing, ranking, export, threshold and cost logic. Eighteen of the 47 tests need the real `model/model.json`: parity with scikit-learn on 322 reference rows, contributions summing to the log-odds, saved metrics vs the project report (test AUC 0.7099, CV AUC about 0.703), and decision-table consistency. `tests/explain.test.js` covers the explanation and recommendation logic (see below). Without the model file the model-dependent tests are reported as skipped, not passed.
+Covers the spline maths (partition of unity, linear extrapolation), input validation, CSV parsing, ranking, export, threshold and cost logic. Eighteen of the 47 tests need the real `model/model.json`: parity with pyGAM on 394 reference rows, contributions summing to the log-odds, saved metrics vs the project analysis (test AUC 0.7095, CV AUC 0.7041), and decision-table consistency. `tests/explain.test.js` covers the explanation and recommendation logic (see below). Without the model file the model-dependent tests are reported as skipped, not passed.
 
 ## Files
 

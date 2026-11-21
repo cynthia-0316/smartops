@@ -1,11 +1,13 @@
 /* SmartOps core: model inference, decision/cost maths and CSV handling.
  * No dependencies. Works in the browser (window.SmartOpsCore) and in Node (module.exports).
  *
- * The model is a spline logistic regression exported from scikit-learn (see
- * notebooks/dashboard_model_export.ipynb). Inference re-implements, exactly:
- *   SplineTransformer(degree=3, knots="quantile", extrapolation="linear")
- *   -> StandardScaler -> LogisticRegression
- * and is tested against scikit-learn's own predictions (dashboard/tests).
+ * The model is an additive spline model exported from Python (see the notebook named in
+ * model.json). Per sensor it stores a B-spline knot vector, the coefficients and the
+ * development mean of each basis column, so the sensor effects (centred log-odds) add up
+ * exactly to the logit. Inference re-implements the cubic B-spline basis with linear
+ * extrapolation outside the training range, and is tested against the training library's
+ * own predictions (dashboard/tests). Works for the penalised GAM (pyGAM) and for a
+ * spline logistic regression alike.
  */
 (function (root) {
   'use strict';

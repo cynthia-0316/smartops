@@ -148,7 +148,7 @@
     const c = C.confusionAt(oof, thrIdx());
     const t = M.test;
     const cards = [
-      {k: 'Model', v: 'Spline logistic regression', s: 'One additive model, fitted on development data only.', cls: 'accent', small: true},
+      {k: 'Model', v: 'Penalised logistic GAM', s: 'One additive model, one smooth curve per sensor, fitted on development data only.', cls: 'accent', small: true},
       {k: 'Validated performance (held-out test)', v: 'AUC ' + f2(t.auc), s: `95% CI ${f2(t.auc_ci[0])} to ${f2(t.auc_ci[1])} on ${t.n.toLocaleString()} engines. Cross-validation ${f2(M.cv.auc_mean)} ± ${f2(M.cv.auc_std)}.`},
       {k: `Engines flagged at threshold ${f2(state.threshold)}`, v: pct(c.flaggedShare), s: `Development data, out-of-fold: ${Math.round(c.flaggedShare * c.n).toLocaleString()} of ${c.n.toLocaleString()} engines.`},
       {k: 'Engines above the threshold in your upload', v: state.fleet ? state.fleet.rows.filter((r) => r.risk >= state.threshold).length.toLocaleString() : 'None yet', s: state.fleet ? `of ${state.fleet.rows.length.toLocaleString()} valid rows above the threshold.` : 'Upload a fleet file on Fleet Priorities.'}
@@ -164,7 +164,7 @@
       `<p>At threshold <strong>${f2(state.threshold)}</strong> the model flags <strong>${pct(c.flaggedShare)}</strong> of development engines. <strong>${pct(c.precision)}</strong> of the flagged engines carry the <em>Needs Maintenance</em> label (${pct(prev)} by chance) and <strong>${pct(c.recall)}</strong> of all labelled cases are found.</p>` +
       `<div class="next"><strong>Recommended use.</strong> Rank engines by score and inspect from the top down as far as your capacity allows. Choose the threshold from your own cost of a missed case. A human reviews every flagged engine.</div>` +
       `<p>${saving > 0.005 ? `If a missed case costs about the same as an unnecessary inspection, model-guided inspection (best threshold ${f2(b1.threshold)}) lowers expected cost by about <strong>${pct(saving, 0)}</strong> versus the better no-model option.` : 'Under equal costs the model does not clearly beat the no-model options.'} ${rx ? `Once a missed case costs about <strong>${rx}×</strong> an unnecessary inspection or more, simply inspecting every engine is about as cheap.` : ''} <span class="muted">Assumptions, not company data.</span></p>`;
-    $('foot-model').textContent = `Model: ${art.meta.name} · trained on ${art.meta.trained_on} (${art.meta.n_dev.toLocaleString()} rows) · exported ${art.meta.created} · scikit-learn ${art.meta.sklearn_version}`;
+    $('foot-model').textContent = `Model: ${art.meta.name} · trained on ${art.meta.trained_on} (${art.meta.n_dev.toLocaleString()} rows) · exported ${art.meta.created} · ${art.meta.pygam_version ? 'pyGAM ' + art.meta.pygam_version : 'scikit-learn ' + art.meta.sklearn_version}`;
   }
 
   /* ---------- Predict ---------- */
@@ -412,7 +412,7 @@
     const diffs = art.reference.X.map((row, i) => Math.abs(model.predict(row) - art.reference.proba[i]));
     const mx = Math.max(...diffs);
     const ok = mx < 1e-8;
-    $('selfcheck').innerHTML = `<div class="errors ${ok ? 'ok' : ''}"><strong>${ok ? 'Pass' : 'FAIL'}:</strong> ${art.reference.X.length} reference predictions (${art.reference.n_real_test_rows} real test rows plus edge cases outside the training range) differ from scikit-learn by at most ${mx.toExponential(1)}.</div>`;
+    $('selfcheck').innerHTML = `<div class="errors ${ok ? 'ok' : ''}"><strong>${ok ? 'Pass' : 'FAIL'}:</strong> ${art.reference.X.length} reference predictions (${art.reference.n_real_test_rows} real test rows plus edge cases outside the training range) differ from the values the training library produced by at most ${mx.toExponential(1)}.</div>`;
   }
 
   function drawCurve() {

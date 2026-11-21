@@ -273,7 +273,7 @@ test('real model: reference 65% and observed prevalence 63% are reported as diff
   const m = new C.Model(real);
   const e = C.explainPrediction(m, real.reference.X[0], 0.5);
   assert.ok(Math.abs(e.referenceProbability - sig(real.logistic.intercept)) < 1e-12);
-  assert.ok(Math.abs(e.referenceProbability - 0.6532) < 0.0005);
+  assert.ok(Math.abs(e.referenceProbability - 0.6522) < 0.0005);
   assert.ok(Math.abs(e.observedPrevalence - real.metrics.dev_prevalence) < 1e-12);
   assert.ok(Math.abs(e.observedPrevalence - 0.6305) < 0.0005);
   assert.ok(e.referenceProbability - e.observedPrevalence > 0.01, 'they are different numbers');
