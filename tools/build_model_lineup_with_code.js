@@ -138,7 +138,7 @@ must('${esc(t.name)}${t.name.startsWith("GAM") ? ` <span class="tag best">best C
   '${esc(t.name)}${t.name.startsWith("GAM") ? ` <span class="tag best">best CV</span>` : ""}${t.name.startsWith("Spline") ? ` <span class="tag">deployed in dashboard</span>` : ""}');
 
 /* --- nav, hero note, footer --- */
-must('<a href="#runs">All runs</a>', '<a href="#runs">All runs</a><a href="#business">SmartOps use</a><a href="#code-appendix" class="nav-code">Code Appendix</a>');
+must('<a href="#runs">All runs</a>', '<a href="#runs">All runs</a><a href="#business">Business decisions</a><a href="#code-appendix" class="nav-code">Code Appendix</a>');
 must('</p>\n  <div class="tiles">',
   '</p>\n  <p class="lede" style="font-size:0.95rem">Results come first. Below them, the <a href="#code-appendix">Code Appendix</a> holds the <b>executed Google Colab notebook</b> (every code cell with its real output and charts) and all the Python code behind the saved experiments. This file is the final submission version.</p>\n  <div class="tiles">');
 /* --- hero: heading and subtitle say the page holds findings AND code; prominent jump links --- */
@@ -181,7 +181,10 @@ const business = `
   </div>
 </section>
 `;
-must('<section id="runs">', business + '\n<section id="runs">');
+const decision = require('./decision_section.js')(path.join(ROOT, 'reports/colab_run/SmartOps_Final_Colab_Analysis.executed.ipynb'));
+const businessFinal = business.replace(/<section id="business">[\s\S]*?<\/section>/, () => decision.html);
+if (businessFinal === business) throw new Error('business section not replaced');
+must('<section id="runs">', businessFinal + '\n<section id="runs">');
 
 /* --- appendix: CSS, HTML, data, script --- */
 const css = `
@@ -238,7 +241,7 @@ h3.nb-h { font-size: 1.15rem; } h4.nb-h { font-size: 1.05rem; } h5.nb-h { font-s
 .nb-table table { font-size: 0.8rem; } .nb-table td, .nb-table th { text-align: right; white-space: nowrap; } .nb-table th:first-child, .nb-table td:first-child { text-align: left; }
 @media (max-width: 560px) { details.sec > summary { padding: 12px 12px; } details.sec .body { padding: 2px 10px 14px; } .file pre { font-size: 0.74rem; } }
 `;
-must('</style>', css + '</style>');
+must('</style>', css + decision.css + '</style>');
 
 const colabHtml = esc(COLAB_URL);
 const NB_RENDERED = require('./render_notebook.js')(path.join(ROOT, 'reports/colab_run/SmartOps_Final_Colab_Analysis.executed.ipynb'));
