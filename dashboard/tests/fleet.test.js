@@ -167,3 +167,16 @@ test('Fleet page: capacity is not required to analyze, and prediction and priori
   const text = fleet + app.slice(app.indexOf('function renderFleet'), app.indexOf('function download'));
   assert.ok(!/[>"' ](healthy|safe)\b[^.]*engine/i.test(text.replace(/not (certified )?(healthy|safe)[^.]*\./gi, '').replace(/not cleared as safe/gi, '')), 'below-threshold engines must not be called healthy or safe');
 });
+
+test('Fleet tables: every engine row can be opened to show the model explanation (same logic as the Predict page)', () => {
+  const app = read('js/app.js');
+  assert.ok(app.includes('function fleetDetail(r, cols)'), 'detail renderer exists');
+  assert.ok(app.includes('C.explainPrediction(model, r.values, state.threshold)'), 'detail uses the real model explanation, not separate text');
+  assert.ok(app.includes('data-open-predict') && app.includes('function openInPredict'), 'hand-off to the Predict page');
+  assert.ok(/class="rowbtn"[^`]*aria-expanded/.test(app), 'rows are keyboard-accessible buttons with aria-expanded');
+  assert.ok(app.includes("['fleet-table', 'prio-table']"), 'both the all-engines and the prioritised table are clickable');
+  assert.ok(app.includes('fleetDetail(r, 6)') && app.includes('fleetDetail(r, 7)'), 'detail rows span the full table width');
+  const detail = app.slice(app.indexOf('function fleetDetail'), app.indexOf('function openInPredict'));
+  assert.match(detail, /not a fault diagnosis/);
+  assert.ok(!/\b(replace|broken|defective|malfunction\w*|will fail)\b/i.test(detail));
+});

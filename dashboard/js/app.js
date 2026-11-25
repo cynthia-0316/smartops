@@ -40,7 +40,7 @@
   const oof = art.oof;
   const DEFAULTS = {threshold: 0.5, ratio: 1, unit: 100, capPct: 10};
   const RESULT_PLACEHOLDER = '<div class="panel"><h2>Result</h2><p class="muted">Pick a one-click example or enter readings, then press <strong>Analyze Engine</strong>. You will get the risk, the main reason, and what to check first.</p></div>';
-  const state = {threshold: DEFAULTS.threshold, ratio: DEFAULTS.ratio, unit: DEFAULTS.unit, capPct: DEFAULTS.capPct, fleet: null, capN: null, capErr: false, fleetLimit: 100, lastRow: null, detailsOpen: false};
+  const state = {threshold: DEFAULTS.threshold, ratio: DEFAULTS.ratio, unit: DEFAULTS.unit, capPct: DEFAULTS.capPct, fleet: null, capN: null, capErr: false, fleetLimit: 100, openRows: new Set(), lastRow: null, detailsOpen: false};
 
   if (art.meta.fixture) {
     const b = $('banner');
@@ -289,7 +289,41 @@
     /* ---------- Fleet: predict every engine first, prioritise inspections only when needed ---------- */
   const PAGE = 100, PRIO_LIMIT = 300;
   const cardHtml = (x) => `<div class="card ${x.cls || ''}"><div class="k">${esc(x.k)}</div><div class="v">${esc(x.v)}</div><div class="s">${esc(x.s)}</div></div>`;
-  const engineLabel = (r) => r.id ? esc(r.id) : `<span class="muted">CSV row ${r.rowNumber}</span>`;
+  const engineLabel = (r) => {
+    const open = state.openRows.has(r.rowNumber);
+    return `<button type="button" class="rowbtn" data-row="${r.rowNumber}" aria-expanded="${open}" title="Show which sensors drive this score and what to check first">${open ? '▾' : '▸'} ${r.id ? esc(r.id) : 'CSV row ' + r.rowNumber}</button>`;
+  };
+  const oddsTxt = (it) => it.oddsFactor > 1000 ? '>1,000' : it.oddsFactor < 0.001 ? '<0.001' : it.oddsFactor.toFixed(2);
+  const STEP_KIND = {caution: 'Verify first', area: 'Possible area to investigate', action: 'Recommended action'};
+
+  // Engine detail: which sensors drive this engine's score and what to check first (same model explanation as the Predict page).
+  function fleetDetail(r, cols) {
+    if (!state.openRows.has(r.rowNumber)) return '';
+    const E = C.explainPrediction(model, r.values, state.threshold);
+    const rows = E.items.slice().sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution)).map((it) => {
+      const eff = it.direction === 'up' ? `<span class="tag m">▲ raises score · odds ×${oddsTxt(it)}</span>`
+        : it.direction === 'down' ? `<span class="tag b">▼ lowers score · odds ×${oddsTxt(it)}</span>` : '<span class="tag g">small effect</span>';
+      const rel = it.outsideTraining ? '<span class="tag m">outside training range</span>' : it.relation === 'within' ? 'within typical range' : it.relation + ' typical range';
+      return `<tr><td class="l">${esc(it.name)}</td><td>${esc(C.withUnit(it.value, it.unit))}</td><td class="l">${rel}</td><td class="l">${eff}</td></tr>`;
+    }).join('');
+    const steps = E.steps.map((s) => `<li class="${s.kind}"><span class="kind">${STEP_KIND[s.kind]}</span>${esc(s.text)}</li>`).join('');
+    const label = r.id ? esc(r.id) : 'CSV row ' + r.rowNumber;
+    return `<tr class="detail"><td colspan="${cols}"><div class="detail-box">` +
+      `<p class="d-head"><strong>${label}</strong> · predicted probability ${pct(r.risk, 1)} · ${esc(C.recommendation(r, state.threshold))}</p>` +
+      `<div class="d-grid"><div><h4>Sensors behind this score</h4><table class="mini"><thead><tr><th class="l">Sensor</th><th>Reading</th><th class="l">Compared with training data</th><th class="l">Effect on this score</th></tr></thead><tbody>${rows}</tbody></table>` +
+      `<p class="hint">Effects are measured against each sensor's average in the development data. Odds multipliers are not percentage points.</p></div>` +
+      `<div><h4>Why</h4><p>${esc(E.glance.reason)}</p><h4>What to check first</h4><p>${esc(E.glance.next)}</p><ol class="steps">${steps}</ol></div></div>` +
+      `<div class="row"><button type="button" class="btn small" data-open-predict="${r.rowNumber}">Open the full analysis on the Predict page</button></div>` +
+      `<p class="hint">Model estimate, not a fault diagnosis. It shows which readings to check first, not where the problem is. A person decides what to inspect and repair.</p></div></td></tr>`;
+  }
+  function openInPredict(rowNumber) {
+    const r = state.fleet && state.fleet.rows.find((x) => x.rowNumber === rowNumber);
+    if (!r) return;
+    r.values.forEach((v, i) => { $('in-' + i).value = Number(v.toFixed(4)); $('in-' + i).removeAttribute('aria-invalid'); });
+    $('form-errors').hidden = true;
+    location.hash = '#predict';
+    $('form').requestSubmit();
+  }
   const probCell = (p) => `<td><strong>${pct(p, 1)}</strong><span class="pbar" aria-hidden="true"><i style="width:${Math.max(1, Math.round(p * 100))}%"></i></span></td>`;
   const driverCell = (r) => r.driver ? `${esc(r.driver.name)} <small>▲ odds ${r.driver.oddsFactor > 1000 ? '>1,000' : r.driver.oddsFactor.toFixed(2)}×</small>` : '<span class="muted">No single driver</span>';
   const rangeNote = (r) => r.outOfRange.length ? `<span class="tag m" title="${esc('Outside training range: ' + r.outOfRange.join(', '))}">Verify readings</span>` : '';
@@ -319,7 +353,7 @@
         renderOverview();
         return;
       }
-      state.fleet = res; state.fleetLimit = PAGE;
+      state.fleet = res; state.fleetLimit = PAGE; state.openRows = new Set();
       $('filter').value = 'all';
       const n = res.rows.length;
       msg.className = 'errors ok'; msg.hidden = false;
@@ -351,6 +385,18 @@
       }
       renderPrioritize();
     });
+    ['fleet-table', 'prio-table'].forEach((id) => $(id).addEventListener('click', (e) => {
+      const p = e.target.closest('[data-open-predict]');
+      if (p) { openInPredict(Number(p.dataset.openPredict)); return; }
+      if (e.target.closest('tr.detail')) return;
+      const tr = e.target.closest('tr[data-row]');
+      if (!tr) return;
+      const key = Number(tr.dataset.row);
+      if (state.openRows.has(key)) state.openRows.delete(key); else state.openRows.add(key);
+      renderFleet();
+      const nb = $(id).querySelector('button.rowbtn[data-row="' + key + '"]');
+      if (nb) nb.focus({preventScroll: true});
+    }));
     $('btn-export-all').onclick = () => {
       if (!state.fleet) return;
       download('smartops_all_predictions.csv', C.exportAllCSV(model, state.fleet.rows, state.threshold));
@@ -377,6 +423,7 @@
     sb.setAttribute('aria-label', `${S.needs} of ${S.total} engines need inspection, ${S.below} are below the threshold`);
     sb.innerHTML = `<span class="s-need" style="width:${(S.pctFlagged * 100).toFixed(2)}%"></span><span class="s-below" style="width:${((1 - S.pctFlagged) * 100).toFixed(2)}%"></span>`;
     $('id-note').textContent = fl.idColumn ? `Engine IDs come from the "${fl.idColumn}" column.` : 'No Engine ID column was found, so engines are identified by their CSV row number (the header is row 1).';
+    $('id-note').textContent += ' Click an engine to see which sensors drive its score and what to check first.';
 
     const mode = $('filter').value;
     const shown = mode === 'above' ? rows.filter((r) => r.risk >= thr) : mode === 'below' ? rows.filter((r) => r.risk < thr) : rows;
@@ -385,7 +432,7 @@
     const body = visible.map((r) => {
       const needs = r.risk >= thr;
       const tag = needs ? `<span class="tag y">${C.NEEDS_INSPECTION}</span>` : `<span class="tag g">${C.BELOW_THRESHOLD}</span>`;
-      return `<tr class="${needs ? 'flag' : ''}"><td>${r.rank}</td><td class="l">${engineLabel(r)}</td>${probCell(r.risk)}<td class="l">${tag}</td><td class="l">${driverCell(r)}</td><td class="l">${rangeNote(r)}</td></tr>`;
+      return `<tr class="clickable ${needs ? 'flag' : ''}" data-row="${r.rowNumber}"><td>${r.rank}</td><td class="l">${engineLabel(r)}</td>${probCell(r.risk)}<td class="l">${tag}</td><td class="l">${driverCell(r)}</td><td class="l">${rangeNote(r)}</td></tr>` + fleetDetail(r, 6);
     }).join('');
     $('fleet-table').innerHTML = `<caption class="sr">Predicted maintenance probability for every analyzed engine, highest first</caption>${head}<tbody>${body || '<tr><td colspan="6" class="l">No engines match this filter.</td></tr>'}</tbody>`;
     $('fleet-more').textContent = `Showing ${visible.length.toLocaleString()} of ${shown.length.toLocaleString()} engine(s). The exported CSV always contains every analyzed engine.`;
@@ -400,7 +447,14 @@
       $('invalid-list').innerHTML = fl.invalid.slice(0, 50).map((x) => `<li>Row ${x.rowNumber}: ${esc(x.errors.join(' '))}</li>`).join('') + (fl.invalid.length > 50 ? `<li>…and ${fl.invalid.length - 50} more.</li>` : '');
     }
     renderPrioritize();
+    fitDetail();
   }
+
+  // Keep the open detail panels as wide as the visible table area (the table itself may scroll sideways on phones).
+  function fitDetail() {
+    document.querySelectorAll('.table-wrap').forEach((w) => w.style.setProperty('--wrapw', Math.max(280, w.clientWidth - 2) + 'px'));
+  }
+  window.addEventListener('resize', fitDetail);
 
   // Optional business step. Uses the scores as they are; capacity never changes a prediction.
   function renderPrioritize() {
@@ -426,8 +480,9 @@
     ].map(cardHtml).join('');
     const head = '<thead><tr><th>Priority</th><th>Risk rank</th><th class="l">Engine</th><th>Predicted probability</th><th class="l">Main model driver</th><th class="l">Suggested first check</th><th class="l">Notes</th></tr></thead>';
     const body = P.selected.slice(0, PRIO_LIMIT).map((r, k) =>
-      `<tr class="flag"><td>${k + 1}</td><td>${r.rank}</td><td class="l">${engineLabel(r)}</td>${probCell(r.risk)}<td class="l">${driverCell(r)}</td><td class="l wrap">${esc(C.reviewFocus(r.driver))}</td><td class="l">${rangeNote(r)}</td></tr>`).join('');
+      `<tr class="clickable flag" data-row="${r.rowNumber}"><td>${k + 1}</td><td>${r.rank}</td><td class="l">${engineLabel(r)}</td>${probCell(r.risk)}<td class="l">${driverCell(r)}</td><td class="l wrap">${esc(C.reviewFocus(r.driver))}</td><td class="l">${rangeNote(r)}</td></tr>` + fleetDetail(r, 7)).join('');
     $('prio-table').innerHTML = `<caption class="sr">Highest-risk flagged engines selected for inspection within the entered capacity</caption>${head}<tbody>${body}</tbody>`;
+    fitDetail();
     $('prio-more').textContent = P.selected.length > PRIO_LIMIT ? `Showing the first ${PRIO_LIMIT} of ${P.selected.length.toLocaleString()}. The exported list contains all of them.` : 'Predictions above are unchanged. Capacity only sets the order of inspection.';
   }
 
@@ -558,7 +613,7 @@
 
   /* ---------- reset demo ---------- */
   function resetDemo() {
-    Object.assign(state, {threshold: DEFAULTS.threshold, ratio: DEFAULTS.ratio, unit: DEFAULTS.unit, capPct: DEFAULTS.capPct, fleet: null, capN: null, capErr: false, fleetLimit: 100, lastRow: null, detailsOpen: false});
+    Object.assign(state, {threshold: DEFAULTS.threshold, ratio: DEFAULTS.ratio, unit: DEFAULTS.unit, capPct: DEFAULTS.capPct, fleet: null, capN: null, capErr: false, fleetLimit: 100, openRows: new Set(), lastRow: null, detailsOpen: false});
     // Predict
     F.forEach((f, i) => { const e = $('in-' + i); e.value = ''; e.removeAttribute('aria-invalid'); });
     $('form-errors').hidden = true;

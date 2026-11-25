@@ -213,3 +213,22 @@ details.more[open]>summary{margin-bottom:14px}
 .pager{margin:12px 0 4px}
 .zone h3{margin:6px 0 10px;font-size:17px}
 @media (max-width:520px){.field.inline{width:100%;flex-direction:column;align-items:stretch}.field.inline select{width:100%;min-width:0}.zone{padding:14px 12px 2px}.pbar{display:none}}
+
+/* ---------- Fleet: click an engine to see why ---------- */
+.rowbtn{background:none;border:0;padding:4px 6px;margin:-4px -6px;font:inherit;font-weight:600;color:var(--blue-ink);cursor:pointer;text-align:left;border-radius:6px;min-height:32px}
+.rowbtn:hover{text-decoration:underline}
+.rowbtn:focus-visible{outline:2px solid var(--blue);outline-offset:1px}
+tr.clickable{cursor:pointer}
+tr.clickable:hover td{background:#f5f8ff}
+tr.detail td{background:#fbfcff;white-space:normal;text-align:left;padding:0;border-bottom:2px solid var(--line)}
+.detail-box{position:sticky;left:0;box-sizing:border-box;width:var(--wrapw,auto);padding:14px 16px}
+.d-head{margin:0 0 10px}
+.d-grid{display:grid;grid-template-columns:1.25fr 1fr;gap:18px;margin-bottom:10px}
+.detail-box h4{margin:0 0 6px;font-size:14px}
+.detail-box p{margin:0 0 10px}
+table.mini{font-size:13px}
+table.mini th,table.mini td{padding:6px 8px;white-space:normal}
+table.mini th:first-child,table.mini td:first-child{text-align:left}
+.detail-box ol.steps{padding-left:18px;margin:6px 0 0}
+.tag.b{background:var(--blue-soft);color:var(--blue-ink)}
+@media (max-width:860px){.d-grid{grid-template-columns:1fr}}
