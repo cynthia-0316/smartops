@@ -168,6 +168,17 @@
   }
 
   /* ---------- Predict ---------- */
+  // The Predict form opens pre-filled with the model-classified "Above threshold" example, so a demo needs no typing.
+  let defaultRow = null;
+  function prefillDefault() {
+    if (!defaultRow) return;
+    defaultRow.forEach((v, i) => { $('in-' + i).value = Number(v.toFixed(4)); $('in-' + i).removeAttribute('aria-invalid'); });
+    $('form-errors').hidden = true;
+    state.skipScroll = true;
+    $('form').requestSubmit();
+    state.skipScroll = false;
+  }
+
   function buildForm() {
     $('fields').innerHTML = F.map((f, i) => {
       const r = art.ranges[f];
@@ -178,10 +189,11 @@
     // One-click examples: real held-out test rows, classified by the trained model itself at the default threshold.
     const realRows = art.reference.X.slice(0, art.reference.n_real_test_rows);
     const picks = C.pickExamples(model, realRows, DEFAULTS.threshold);
+    defaultRow = picks.hi ? realRows[picks.hi.index] : null;
     const exDefs = [['hi', 'Above threshold'], ['mid', 'Near threshold'], ['lo', 'Below threshold']];
     $('examples').innerHTML = exDefs.filter((d) => picks[d[0]]).map((d) =>
       `<button type="button" class="btn ex ${d[0]}" data-ex="${d[0]}">${d[1]} <small>model says ${pct(picks[d[0]].p, 0)}</small></button>`).join('');
-    $('example-note').textContent = `Examples are real rows from the held-out test set (labels not shown), sorted by the trained model at the default ${pct(DEFAULTS.threshold, 0)} threshold. Clicking one sets that threshold.`;
+    $('example-note').textContent = `Examples are real rows from the held-out test set (labels not shown), sorted by the trained model at the default ${pct(DEFAULTS.threshold, 0)} threshold. Clicking one sets that threshold. The form opens pre-filled with the Above threshold example: change any value and press Analyze Engine, or press Clear to start empty.`;
     $('examples').addEventListener('click', (e) => {
       const b = e.target.closest('button[data-ex]');
       if (!b || !picks[b.dataset.ex]) return;
@@ -210,7 +222,7 @@
       box.hidden = true;
       state.lastRow = {values: v.values, warnings: v.warnings};
       renderResult();
-      $('result').scrollIntoView({block: 'start'});
+      if (!state.skipScroll) $('result').scrollIntoView({block: 'start'});
     });
   }
 
@@ -632,6 +644,7 @@
     // Insights
     $('curve-sensor').value = '0';
     renderOverview(); renderBusiness(); drawCurve();
+    prefillDefault();
     const t = $('toast');
     t.textContent = 'Demo reset: inputs cleared and default settings restored.';
     t.classList.add('show');
@@ -646,5 +659,6 @@
   $('r-auc-pct').textContent = pct(M.test.auc, 0);
   buildForm(); buildFleet(); buildBusiness();
   renderOverview(); renderInsights(); renderBusiness();
+  prefillDefault();
   window.addEventListener('hashchange', () => { if (location.hash === '#insights') drawCurve(); });
 })();

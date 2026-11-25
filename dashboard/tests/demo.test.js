@@ -165,3 +165,14 @@ test('real model: model_data.js (loaded by the page) holds exactly the model.jso
   const body = js.slice('window.SMARTOPS_MODEL = '.length).trimEnd().slice(0, -1);
   assert.deepEqual(JSON.parse(body), real);
 });
+
+test('Predict opens pre-filled with the model-classified Above threshold example, and Reset demo restores it', () => {
+  const app = read('js/app.js');
+  assert.ok(app.includes('defaultRow = picks.hi ? realRows[picks.hi.index] : null'), 'default engine is picked by the model, not hardcoded');
+  assert.ok(!/prefillDefault[\s\S]{0,400}\b(\d{3,4}\.\d+|\[\s*\d)/.test(app.slice(app.indexOf('function prefillDefault'), app.indexOf('function buildForm'))), 'no hardcoded sensor values in the default');
+  const start = app.slice(app.indexOf('/* ---------- start'));
+  assert.ok(start.includes('prefillDefault();'), 'form is pre-filled on load');
+  const reset = app.slice(app.indexOf('function resetDemo'), app.indexOf('/* ---------- start'));
+  assert.ok(reset.includes('prefillDefault();'), 'Reset demo returns to the pre-filled state');
+  assert.ok(app.includes('if (!state.skipScroll)'), 'pre-filling on load must not scroll the page');
+});
