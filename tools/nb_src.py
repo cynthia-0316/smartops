@@ -1,0 +1,734 @@
+# %% [markdown]
+# # SmartOps Final Analysis: Engine Condition Prediction (CIS 508)
+#
+# This notebook is the executable, reproducible record behind the *SmartOps Model Lineup* page. Run it top to bottom in Google Colab
+# (**Runtime > Run all**, about 15-25 minutes on a free CPU runtime). Nothing needs to be installed locally.
+#
+# ### What is freshly executed here, and what is loaded from the repository
+# Every output below is tagged, so nobody has to guess:
+#
+# | Tag | Meaning |
+# |---|---|
+# | **[FRESH]** | Computed in this notebook run, from the raw data and the code shown. |
+# | **[HISTORICAL]** | Read from a saved, committed experiment result (`experiments/log.csv`, `results/*.csv`, ...). *Not rerun* here: the 99 configurations took many hours across several machines. The producing scripts are listed in Section M and in the code appendix of the results page. |
+# | **[VERIFY]** | A fresh computation compared with a historical number (the check passes if they agree within a stated tolerance). |
+#
+# ### Evaluation protocol (from `src/common.py`)
+# * 19,535 labelled engines, six raw sensors, target `Engine Condition` (1 = Needs Maintenance).
+# * Fixed splits from the dataset: **train 14,650 / validation 1,954 / test 2,931**. Development set = train + validation = **16,604** rows.
+# * All model selection uses **repeated stratified 5-fold cross-validation, 3 repeats, seed 42** (15 folds) on the development set only.
+# * The **test set is loaded once, in Section I**, after every modelling choice is fixed. Nothing is tuned on it.
+# * Nested cross-validation (tuning inside each training fold) is reported separately from fixed-setting or same-fold evaluations.
+#
+# ### Business context and limits
+# SmartOps helps maintenance teams decide which engines to inspect first when inspection capacity is limited. Model scores support
+# **prioritisation**; they are not confirmed mechanical diagnoses. Cost-saving scenarios are hypothetical (the data has no cost
+# information). Human review is required. The dataset's provenance and label definition are uncertain.
+#
+# ### Selected model
+# The selected (and deployed) model is the **penalised logistic GAM with 20 splines per sensor**. It was chosen because its cross-validation
+# score is competitive with every other family we tried (the differences are within fold-to-fold noise), because it is **interpretable**
+# (one smooth curve per sensor, additive on the log-odds scale) and because it is **easy to implement** (120 coefficients plus knots, which
+# the browser dashboard evaluates without a server). It is not claimed to be the most accurate model. The **Spline Logistic Regression**
+# (6 knots, C = 0.03) is its closest simpler comparator and is kept in full as a separate experiment; it is never relabelled as the GAM.
+
+# %% [markdown]
+# ## 0. Setup: packages, repository files, seeds, versions
+
+# %%
+# Install only what Colab does not already ship. (pandas, numpy, scipy, scikit-learn, matplotlib are preinstalled.)
+%pip install -q pygam catboost
+
+# %%
+import os, sys, time, json, hashlib, platform, subprocess, warnings, urllib.request
+from pathlib import Path
+warnings.filterwarnings("ignore")
+
+import numpy as np
+import pandas as pd
+import scipy, sklearn, matplotlib
+import matplotlib.pyplot as plt
+from joblib import Parallel, delayed
+from scipy import stats
+
+from sklearn.base import BaseEstimator, ClassifierMixin
+from sklearn.dummy import DummyClassifier
+from sklearn.ensemble import ExtraTreesClassifier, HistGradientBoostingClassifier, RandomForestClassifier
+from sklearn.inspection import permutation_importance
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import (average_precision_score, brier_score_loss, confusion_matrix, roc_auc_score, roc_curve)
+from sklearn.model_selection import GridSearchCV, RepeatedStratifiedKFold, StratifiedKFold
+from sklearn.naive_bayes import GaussianNB
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import QuantileTransformer, SplineTransformer, StandardScaler
+
+RANDOM_STATE = 42
+np.random.seed(RANDOM_STATE)
+pd.set_option("display.width", 200); pd.set_option("display.max_columns", 30)
+# SmartOps palette (same colours as the Model Lineup page): blue accent, orange highlight, greys
+SMARTOPS = {"accent": "#2a78d6", "hi": "#eb6834", "soft": "#9ecae9", "ink": "#11161c", "muted": "#6f7884", "grid": "#e3e7eb", "plane": "#f4f6f8"}
+plt.rcParams.update({"figure.dpi": 110, "axes.spines.top": False, "axes.spines.right": False,
+                     "axes.prop_cycle": plt.cycler(color=[SMARTOPS["accent"], SMARTOPS["hi"], "#4a525c", SMARTOPS["soft"], "#8a5a00", "#6f7884"]),
+                     "axes.edgecolor": "#c2c9d0", "axes.labelcolor": SMARTOPS["ink"], "text.color": SMARTOPS["ink"], "xtick.color": SMARTOPS["muted"], "ytick.color": SMARTOPS["muted"],
+                     "grid.color": SMARTOPS["grid"], "figure.facecolor": "white", "axes.facecolor": "white", "font.family": "DejaVu Sans"})
+
+REPO_URL = "https://github.com/cynthia-0316/smartops.git"
+REPO_REF = "feat/final-colab-gam-consistency"      # branch (or tag) to read the saved experiment artifacts from
+
+# --- locate the repository files (clone in Colab; reuse the checkout if run from inside it) ---
+if Path("experiments/log.csv").exists():
+    ROOT = Path.cwd()
+elif Path("../experiments/log.csv").exists():
+    ROOT = Path.cwd().parent
+else:
+    ROOT = Path("/content/smartops")
+    if not ROOT.exists():
+        subprocess.run(["git", "clone", "--depth", "1", "--branch", REPO_REF, REPO_URL, str(ROOT)], check=True)
+print("repository root:", ROOT)
+print("git commit     :", subprocess.run(["git", "-C", str(ROOT), "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip() or "n/a")
+
+print("\n=== Environment ===")
+print("python      ", platform.python_version())
+for mod in (np, pd, scipy, sklearn, matplotlib):
+    print(f"{mod.__name__:12s}", mod.__version__)
+try:
+    import catboost; print("catboost    ", catboost.__version__)
+except Exception as e:
+    catboost = None; print("catboost     NOT AVAILABLE:", repr(e)[:120])
+try:
+    import pygam; print("pygam       ", pygam.__version__)
+except Exception as e:
+    pygam = None; print("pygam        NOT AVAILABLE:", repr(e)[:120])
+print("CPU cores   ", os.cpu_count())
+print("random seed ", RANDOM_STATE, "(CV folds, bootstrap, model seeds)")
+
+# %% [markdown]
+# ## A. Data loading and dataset description
+# **Source:** Hugging Face dataset `jskswamy/predictive-maintenance-data` (MIT licence), downloaded exactly as `scripts/download_data.py` does.
+# The same 19,535-row table is committed in the repo as `data/engine/engine_data.csv`; Section A checks that the two copies are identical.
+
+# %%
+HF_BASE = "https://huggingface.co/datasets/jskswamy/predictive-maintenance-data/resolve/main/"
+DATA_DIR = Path("/content/predictive-maintenance-data") if Path("/content").exists() else ROOT / "data" / "predictive-maintenance-data"
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+for name in ["engine_data.csv", "train.csv", "val.csv", "test.csv"]:
+    target = DATA_DIR / name
+    if not (target.exists() and target.stat().st_size > 0):
+        urllib.request.urlretrieve(HF_BASE + name, target)
+    print(f"{name:16s} {target.stat().st_size:>10,} bytes")
+
+TARGET = "Engine Condition"
+RAW_FEATURES = ["Engine RPM", "Lub Oil Pressure", "Fuel Pressure", "Coolant Pressure", "Lub Oil Temp", "Coolant Temp"]
+UNITS = {"Engine RPM": "rpm", "Lub Oil Pressure": "bar", "Fuel Pressure": "bar", "Coolant Pressure": "bar", "Lub Oil Temp": "C", "Coolant Temp": "C"}
+
+full = pd.read_csv(DATA_DIR / "engine_data.csv")
+train_df = pd.read_csv(DATA_DIR / "train.csv")
+val_df = pd.read_csv(DATA_DIR / "val.csv")
+# NOTE: test.csv is deliberately NOT read until Section I.
+
+print("\n[FRESH] full table shape:", full.shape, "| columns:", list(full.columns))
+print("[FRESH] train", train_df.shape, "| val", val_df.shape)
+display(full.head())
+display(full[RAW_FEATURES].describe().T.round(3))
+
+repo_copy = pd.read_csv(ROOT / "data" / "engine" / "engine_data.csv")
+print("[VERIFY] Hugging Face engine_data.csv identical to repo data/engine/engine_data.csv:", full.equals(repo_copy))
+
+# %% [markdown]
+# ## B. Data cleaning: missing values, duplicates, outliers
+# Decision (unchanged from the team's cleaning notebook): **keep every row**. Outliers are flagged, not removed, because nothing indicates
+# they are errors; Section F's historical results include winsorising and label-noise filtering, which did not help.
+
+# %%
+print("[FRESH] missing cells:", int(full.isna().sum().sum()))
+print("[FRESH] duplicate rows:", int(full.duplicated().sum()))
+print("[FRESH] dtypes:", dict(full.dtypes.astype(str)))
+ye = full[TARGET].values
+print("[FRESH] class distribution (all 19,535):")
+print(pd.DataFrame({"count": full[TARGET].value_counts().sort_index(), "share": full[TARGET].value_counts(normalize=True).sort_index().round(4)})
+      .rename(index={0: "0 Normal", 1: "1 Needs Maintenance"}))
+
+q1, q3 = full[RAW_FEATURES].quantile(.25), full[RAW_FEATURES].quantile(.75); iqr = q3 - q1
+iqr_out = (full[RAW_FEATURES] < q1 - 1.5 * iqr) | (full[RAW_FEATURES] > q3 + 1.5 * iqr)
+outlier_table = pd.DataFrame({"iqr_outliers": iqr_out.sum(), "share": iqr_out.mean().round(4),
+                              "needs_maint_rate_in_outliers": [full.loc[iqr_out[c], TARGET].mean() for c in RAW_FEATURES]}).round(4)
+display(outlier_table)
+any_out = iqr_out.any(axis=1)
+print(f"[FRESH] rows with any 1.5xIQR outlier: {int(any_out.sum())} ({any_out.mean():.1%}); needs-maintenance rate there {full.loc[any_out, TARGET].mean():.3f} vs {full[TARGET].mean():.3f} overall")
+print("[FRESH] Coolant Temp > 100 C:", int((full['Coolant Temp'] > 100).sum()), "rows")
+
+# %% [markdown]
+# ## C. Exploratory data analysis
+
+# %%
+fig, axes = plt.subplots(2, 3, figsize=(14, 6.5))
+for ax, col in zip(axes.ravel(), RAW_FEATURES):
+    for label, nm in [(0, "Normal"), (1, "Needs Maintenance")]:
+        ax.hist(full.loc[full[TARGET] == label, col], bins=40, alpha=0.55, density=True, label=nm)
+    ax.set_title(f"{col} ({UNITS[col]})", fontsize=10)
+axes[0, 0].legend(fontsize=8)
+fig.suptitle("[FRESH] Sensor distributions by class", y=1.0); plt.tight_layout(); plt.show()
+
+uni = pd.DataFrame({c: {"single-sensor AUC": max(roc_auc_score(ye, full[c]), 1 - roc_auc_score(ye, full[c])),
+                        "direction": "higher=more risk" if roc_auc_score(ye, full[c]) >= .5 else "higher=less risk"} for c in RAW_FEATURES}).T
+display(uni)
+
+sp = full[RAW_FEATURES].corr("spearman")
+print("[FRESH] largest |Spearman| between two sensors:", round(float(np.abs(sp.values[np.triu_indices(6, 1)]).max()), 3), "(sensors are nearly independent)")
+fig, ax = plt.subplots(figsize=(5.8, 4.8))
+im = ax.imshow(sp, cmap="coolwarm", vmin=-1, vmax=1)
+ax.set_xticks(range(6)); ax.set_xticklabels(RAW_FEATURES, rotation=45, ha="right", fontsize=8)
+ax.set_yticks(range(6)); ax.set_yticklabels(RAW_FEATURES, fontsize=8); fig.colorbar(im); ax.set_title("[FRESH] Spearman correlation of sensors"); plt.tight_layout(); plt.show()
+
+# %% [markdown]
+# ## D. Train / validation / test splitting and leakage prevention
+# * Development set = train + validation (16,604 rows). **Every** choice (model family, settings, thresholds) is made here with repeated CV.
+# * Within each CV fold, preprocessing lives inside a scikit-learn `Pipeline`, so it is fit on that fold's training rows only.
+# * The test file is not opened until Section I.
+
+# %%
+X = pd.concat([train_df[RAW_FEATURES], val_df[RAW_FEATURES]], ignore_index=True)
+y = pd.concat([train_df[TARGET], val_df[TARGET]], ignore_index=True)
+YV = y.values
+N = len(YV)
+print("[FRESH] development set:", X.shape, "| share Needs Maintenance:", round(float(YV.mean()), 4))
+print("[FRESH] train rows", len(train_df), "| val rows", len(val_df), "| class share train/val:", round(train_df[TARGET].mean(), 4), "/", round(val_df[TARGET].mean(), 4))
+
+key = lambda d: set(map(tuple, d[RAW_FEATURES].round(8).values))
+overlap_tv = len(key(train_df) & key(val_df))
+print("[FRESH] identical feature rows shared by train and val:", overlap_tv)
+
+N_SPLITS, N_REPEATS = 5, 3
+CV = RepeatedStratifiedKFold(n_splits=N_SPLITS, n_repeats=N_REPEATS, random_state=RANDOM_STATE)
+FOLDS = list(CV.split(X, y))
+print("[FRESH] CV: repeated stratified", N_SPLITS, "fold x", N_REPEATS, "repeats =", len(FOLDS), "folds; each held-out fold has ~", len(FOLDS[0][1]), "rows")
+print("[FRESH] positive share in each of the first 5 held-out folds:", [round(float(YV[te].mean()), 3) for _, te in FOLDS[:5]])
+
+TEST_LOADS = {"count": 0}          # guard: the test set may be loaded exactly once (Section I)
+def load_test_once():
+    assert TEST_LOADS["count"] == 0, "test set already loaded: no second look is allowed"
+    TEST_LOADS["count"] += 1
+    t = pd.read_csv(DATA_DIR / "test.csv")
+    return t[RAW_FEATURES].copy(), t[TARGET].copy()
+
+# %% [markdown]
+# ## E. Baseline models
+# Always-predict-the-prevalence and straight-line logistic regression. All fits use the same 15 folds and keep out-of-fold predictions.
+
+# %%
+def _fit_fold(factory, i, tr, te):
+    m = factory(); t0 = time.time(); m.fit(X.iloc[tr], YV[tr]); ft = time.time() - t0
+    return i, te, m.predict_proba(X.iloc[te])[:, 1], ft, getattr(m, "best_params_", None)
+
+RESULTS, OOF, FOLD_AUC = {}, {}, {}
+def run_cv(name, factory, n_jobs=-1, kind="fixed setting", note=""):
+    """Score `factory()` on the 15 shared folds. Stores fold AUCs and out-of-fold predictions (3 repeats x N)."""
+    t0 = time.time()
+    out = Parallel(n_jobs=n_jobs)(delayed(_fit_fold)(factory, i, tr, te) for i, (tr, te) in enumerate(FOLDS))
+    preds = np.full((N_REPEATS, N), np.nan); aucs = np.zeros(len(FOLDS)); prs = np.zeros(len(FOLDS)); fts = []; chosen = []
+    for i, te, p, ft, bp in out:
+        preds[i // N_SPLITS, te] = p
+        aucs[i] = roc_auc_score(YV[te], p); prs[i] = average_precision_score(YV[te], p); fts.append(ft); chosen.append(bp)
+    OOF[name], FOLD_AUC[name] = preds, aucs
+    RESULTS[name] = {"cv_auc": aucs.mean(), "cv_auc_sd": aucs.std(), "cv_pr_auc": prs.mean(), "fit_s": float(np.mean(fts)),
+                     "wall_s": time.time() - t0, "protocol": kind, "note": note, "chosen_params": chosen}
+    r = RESULTS[name]
+    print(f"[FRESH] {name:42s} CV AUC {r['cv_auc']:.4f} +/- {r['cv_auc_sd']:.4f} | PR AUC {r['cv_pr_auc']:.4f} | {r['wall_s']:.0f}s | {kind}")
+
+def corrected_ttest(a, b):
+    """Nadeau-Bengio corrected resampled t-test on paired fold scores (a - b)."""
+    d = np.asarray(a) - np.asarray(b); k = len(d)
+    n_te = N / N_SPLITS; n_tr = N - n_te
+    var = d.var(ddof=1) * (1 / k + n_te / n_tr)
+    t = d.mean() / np.sqrt(var) if var > 0 else 0.0
+    return d.mean(), 2 * stats.t.sf(abs(t), k - 1)
+
+run_cv("Dummy (class prior)", lambda: DummyClassifier(strategy="prior"), kind="baseline")
+run_cv("Logistic regression (straight lines)", lambda: make_pipeline(StandardScaler(), LogisticRegression(max_iter=2000)), kind="fixed setting")
+
+# %% [markdown]
+# ## F. Machine learning model training
+# One representative of each major family, with the settings the project carried forward. All are scored with the identical 15 folds.
+# Settings come from the committed experiment scripts (`experiments/batch1.py`, `models.py`, `results/best_params_*.json`).
+# The **penalised GAM (20 splines per sensor)** is the selected model and the one deployed in the browser dashboard; the **Spline logistic regression**
+# (6 knots, C = 0.03) is its simpler comparator. Both are scored with the identical 15 folds, and the GAM is evaluated on the test set in Section I.
+
+# %%
+def spline_lr(n_knots=6, degree=3, C=0.3, knots="quantile"):
+    """Identical to experiments/models.py::spline_lr."""
+    return make_pipeline(SplineTransformer(n_knots=n_knots, degree=degree, knots=knots, extrapolation="linear"),
+                         StandardScaler(), LogisticRegression(C=C, max_iter=5000))
+
+QN = lambda: QuantileTransformer(output_distribution="normal", random_state=0)
+CB_PARAMS = json.loads((ROOT / "results" / "best_params_catboost.json").read_text())
+print("CatBoost parameters (tuned in issue #13, loaded from the repo):", CB_PARAMS)
+
+class GAM(ClassifierMixin, BaseEstimator):
+    """Penalised logistic GAM, as in experiments/batch5.py (smoothing chosen by a lambda grid inside the fit)."""
+    def __init__(self, n_splines=20, lams=None):
+        self.n_splines, self.lams = n_splines, lams
+    def fit(self, Xa, yy):
+        from pygam import LogisticGAM, s
+        Xa = np.asarray(Xa); terms = s(0, n_splines=self.n_splines)
+        for j in range(1, Xa.shape[1]): terms += s(j, n_splines=self.n_splines)
+        lams = np.logspace(-1, 3, 9) if self.lams is None else self.lams
+        self.g_ = LogisticGAM(terms).gridsearch(Xa, np.asarray(yy), lam=lams, progress=False); self.classes_ = np.array([0, 1]); return self
+    def predict_proba(self, Xa):
+        p = self.g_.predict_mu(np.asarray(Xa)); return np.c_[1 - p, p]
+    def predict(self, Xa):
+        return (self.predict_proba(Xa)[:, 1] >= 0.5).astype(int)
+
+if pygam is None:
+    raise RuntimeError("pygam is required: the GAM is the selected model (it is installed in Section 0).")
+
+run_cv("Spline LR (6 knots, C=0.03)", lambda: spline_lr(6, C=0.03), kind="fixed setting")
+run_cv("GAM (20 splines)", lambda: GAM(20), kind="fixed setting", note="selected model; smoothing chosen by a lambda grid inside each fit")
+run_cv("Gaussian NB (rank-transformed)", lambda: make_pipeline(QN(), GaussianNB()), kind="fixed setting")
+run_cv("kNN k=300 (rank-transformed)", lambda: make_pipeline(QuantileTransformer(random_state=0), KNeighborsClassifier(300, weights="distance")), kind="fixed setting")
+run_cv("Random forest (500 trees, leaf 50)", lambda: RandomForestClassifier(500, min_samples_leaf=50, max_features=0.5, random_state=RANDOM_STATE, n_jobs=1), kind="fixed setting")
+run_cv("Extra trees (500 trees, leaf 30)", lambda: ExtraTreesClassifier(500, min_samples_leaf=30, max_features=0.7, random_state=RANDOM_STATE, n_jobs=1), kind="fixed setting")
+run_cv("HistGradientBoosting (defaults)", lambda: HistGradientBoostingClassifier(random_state=RANDOM_STATE), kind="fixed setting")
+if catboost is not None:
+    from catboost import CatBoostClassifier
+    run_cv("CatBoost (#13 settings)", lambda: CatBoostClassifier(**CB_PARAMS, random_seed=RANDOM_STATE, verbose=0, thread_count=1, allow_writing_files=False),
+           kind="same-fold selection (slightly optimistic)", note="settings tuned on all development rows in issue #13")
+else:
+    print("CatBoost not installed: skipped (see Section 0)")
+
+# %% [markdown]
+# ## G. Hyperparameter tuning (nested cross-validation)
+# A tuning score is only fair if the search happens **inside each outer training fold**. Here the spline logistic regression chooses its
+# number of knots and regularisation `C` from a 4 x 3 grid with a 3-fold inner CV, separately for each of the 15 outer folds.
+# The outer held-out fold is never seen by the search.
+
+# %%
+INNER = StratifiedKFold(3, shuffle=True, random_state=RANDOM_STATE)
+spl_grid = lambda: GridSearchCV(spline_lr(), {"splinetransformer__n_knots": [4, 6, 8, 12], "logisticregression__C": [0.03, 0.3, 3]},
+                                cv=INNER, scoring="roc_auc", n_jobs=1)
+run_cv("NESTED spline LR (knots x C tuned inside folds)", spl_grid, kind="nested CV", note="search inside each outer training fold")
+chosen = pd.DataFrame(RESULTS["NESTED spline LR (knots x C tuned inside folds)"]["chosen_params"])
+chosen = chosen.rename(columns=lambda c: c.split("__")[-1])
+print("\n[FRESH] settings chosen inside each of the 15 outer folds (how often each was picked):")
+display(chosen.value_counts().rename("folds").to_frame())
+
+# %% [markdown]
+# ## H. Cross-validation and model comparison
+# **Read the protocol column.** *Nested CV* and *fixed setting* scores are unbiased by selection. *Same-fold selection* means the settings
+# were picked on these very folds, so the score is slightly flattering.
+
+# %%
+fresh = pd.DataFrame(RESULTS).T[["cv_auc", "cv_auc_sd", "cv_pr_auc", "fit_s", "protocol"]]
+fresh[["cv_auc", "cv_auc_sd", "cv_pr_auc", "fit_s"]] = fresh[["cv_auc", "cv_auc_sd", "cv_pr_auc", "fit_s"]].astype(float).round(4)
+fresh = fresh.sort_values("cv_auc", ascending=False)
+print("[FRESH] Model comparison on the 16,604 development rows (repeated stratified 5-fold x 3, seed 42):")
+display(fresh)
+
+fig, ax = plt.subplots(figsize=(8.5, 4.6))
+t = fresh.iloc[::-1]
+colors = [SMARTOPS["accent"] if p.startswith("nested") else (SMARTOPS["soft"] if p.startswith("fixed") else (SMARTOPS["hi"] if p.startswith("same") else "#aaaaaa")) for p in t["protocol"]]
+ax.barh(t.index, t["cv_auc"], xerr=t["cv_auc_sd"], color=colors); ax.set_xlim(0.45, 0.75)
+ax.set_xlabel("CV ROC AUC (mean +/- sd over 15 folds)"); ax.set_title("[FRESH] Development-set CV AUC (blue = nested, light blue = fixed, orange = same-fold selection)", fontsize=9)
+plt.tight_layout(); plt.show()
+
+# --- fold-by-fold significance versus the fixed spline LR ---
+ref = "Spline LR (6 knots, C=0.03)"
+rows = []
+for nm in FOLD_AUC:
+    if nm == ref: continue
+    d, p = corrected_ttest(FOLD_AUC[nm], FOLD_AUC[ref]); rows.append({"model": nm, "AUC diff vs spline LR": round(d, 4), "corrected p": round(p, 3)})
+print(f"[FRESH] Corrected resampled t-test (Nadeau-Bengio) of each model minus '{ref}':")
+display(pd.DataFrame(rows).set_index("model"))
+
+# %%
+# --- [VERIFY] fresh scores against the saved historical runs (same folds, same seeds) ---
+hist_log = pd.read_csv(ROOT / "experiments" / "log.csv").drop_duplicates("name", keep="last").set_index("name")
+team_log = pd.read_csv(ROOT / "results" / "model_results.csv")
+team_raw = team_log[team_log["features"] == "raw"].drop_duplicates("model", keep="last").set_index("model")
+pairs = {"Logistic regression (straight lines)": hist_log.loc["lr_linear", "auc"],
+         "Spline LR (6 knots, C=0.03)": hist_log.loc["lr_spline_k6_C0.03", "auc"],
+         "GAM (20 splines)": hist_log.loc["pygam_ns20", "auc"],
+         "Gaussian NB (rank-transformed)": hist_log.loc["gnb_quantile_normal", "auc"],
+         "kNN k=300 (rank-transformed)": hist_log.loc["knn_quantile_k300", "auc"],
+         "Random forest (500 trees, leaf 50)": hist_log.loc["rf_leaf50", "auc"],
+         "Extra trees (500 trees, leaf 30)": hist_log.loc["et_leaf30", "auc"],
+         "HistGradientBoosting (defaults)": team_raw.loc["HistGradientBoosting (sklearn)", "cv_auc_mean"],
+         "NESTED spline LR (knots x C tuned inside folds)": hist_log.loc["NESTED_spline_lr_grid", "auc"],
+         "CatBoost (#13 settings)": hist_log.loc["ref_catboost_tuned", "auc"]}
+vrows = []
+for nm, h in pairs.items():
+    if nm in RESULTS:
+        f = RESULTS[nm]["cv_auc"]; vrows.append({"model": nm, "fresh CV AUC": round(f, 4), "[HISTORICAL] CV AUC": round(float(h), 4),
+                                                 "difference": round(f - float(h), 4), "agrees (|diff| <= 0.002)": abs(f - float(h)) <= 0.002})
+verify_cv = pd.DataFrame(vrows).set_index("model")
+print("[VERIFY] Fresh run vs saved historical run:")
+display(verify_cv)
+
+# %% [markdown]
+# ### H2. The full 99-configuration record (historical, **not rerun**)
+# The 99 configurations come from `results/model_results.csv` (26 runs by Uzair and Rishabh, issues #10-#18) and `experiments/log.csv`
+# (73 runs, scripts `batch1.py`-`batch5.py`, `nested_final.py`, `torch_nets.py`). Retraining them is unnecessary (EBM, pyGAM and
+# PyTorch nets alone take hours), so the saved results are loaded and summarised here. Only the representative rows in Section F-G are rerun.
+
+# %%
+fam_rules = [("Dummy", "Baseline"), ("dummy", "Baseline"), ("gam", "Additive (GAM / splines)"), ("spline", "Additive (GAM / splines)"), ("spl_", "Additive (GAM / splines)"),
+             ("lr_linear", "Linear"), ("LogisticRegression", "Linear"), ("ebm", "Additive (GAM / splines)"), ("nb", "Naive Bayes"), ("gnb", "Naive Bayes"),
+             ("catboost", "Gradient boosting"), ("CatBoost", "Gradient boosting"), ("lgbm", "Gradient boosting"), ("LightGBM", "Gradient boosting"), ("XGBoost", "Gradient boosting"),
+             ("GradientBoosting", "Gradient boosting"), ("HistG", "Gradient boosting"), ("ref_", "Gradient boosting"), ("mlp", "Neural network"), ("torch", "Neural network"),
+             ("knn", "k-nearest neighbours"), ("rf_", "Tree ensembles (RF / ET)"), ("et_", "Tree ensembles (RF / ET)"), ("stack", "Ensemble / stack"), ("noisefilter", "Additive (GAM / splines)")]
+def family(n):
+    if n.startswith("NESTED_stack") or n.startswith("stack"): return "Ensemble / stack"
+    for k, f in fam_rules:
+        if k in n: return f
+    return "Other"
+
+team_rows = [{"name": r.model + ("" if r.features == "raw" else f" [{r.features}]"), "cv_auc": r.cv_auc_mean, "cv_auc_sd": r.cv_auc_std,
+              "source": "results/model_results.csv", "family": family(r.model),
+              "unbiased": ("NESTED" in str(r.notes)) or ("defaults" in str(r.params)) or ("Dummy" in r.model)} for r in team_log.itertuples()]
+exp_log = pd.read_csv(ROOT / "experiments" / "log.csv").drop_duplicates("name", keep="last")
+exp_rows = [{"name": r.name, "cv_auc": r.auc, "cv_auc_sd": r.auc_std, "source": "experiments/log.csv", "family": family(r.name),
+             "unbiased": r.name.startswith("NESTED") or r.name.startswith("pygam") or r.name in ("lr_linear", "gnb", "ebm_default", "ebm_no_interactions")} for r in exp_log.itertuples()]
+HIST = pd.DataFrame(team_rows + exp_rows)
+print("[HISTORICAL] configurations loaded:", len(HIST), "(team log", len(team_rows), "+ experiment log", len(exp_rows), ")")
+EXPECTED = {"Gradient boosting": 36, "Baseline": 2, "Linear": 1, "Additive (GAM / splines)": 36, "Naive Bayes": 4, "k-nearest neighbours": 3,
+            "Tree ensembles (RF / ET)": 2, "Neural network": 12, "Ensemble / stack": 3}
+counts = HIST["family"].value_counts().to_dict()
+print("[VERIFY] 99 configurations and the page's family counts reproduced:", len(HIST) == 99 and counts == EXPECTED)
+
+fam_summary = (HIST.sort_values("cv_auc", ascending=False).groupby("family")
+               .agg(runs=("name", "count"), best_cv_auc=("cv_auc", "max"), best_config=("name", "first")).sort_values("best_cv_auc", ascending=False))
+fam_summary["best_cv_auc"] = fam_summary["best_cv_auc"].round(4)
+display(fam_summary)
+
+fig, ax = plt.subplots(figsize=(9, 5))
+order = HIST.groupby("family")["cv_auc"].max().sort_values().index
+for k, f in enumerate(order):
+    s = HIST[HIST["family"] == f]
+    ax.scatter(s["cv_auc"], np.full(len(s), k) + np.random.default_rng(0).uniform(-.18, .18, len(s)), s=22, alpha=.75, c=np.where(s["unbiased"], SMARTOPS["accent"], SMARTOPS["soft"]))
+ax.set_yticks(range(len(order))); ax.set_yticklabels(order); ax.set_xlim(0.66, 0.71); ax.axvline(0.7041, c=SMARTOPS["hi"], ls="--", lw=1)
+ax.set_xlabel("CV ROC AUC (dark = nested/fixed, light = same-fold selection); dashed = best single model, GAM 20 splines")
+ax.set_title("[HISTORICAL] 99 configurations: nine families converge on a plateau"); plt.tight_layout(); plt.show()
+print("The two baselines (0.50) lie off the left edge of this plot.")
+
+# %% [markdown]
+# ## I. Final model evaluation on the held-out test set
+# **This is the only place the test file is opened.** The selected model, the penalised GAM (20 splines per sensor), was chosen from the
+# development-set results above (competitive cross-validation score, interpretability, suitability for the browser dashboard). It is refit on all
+# 16,604 development rows and scored once on the 2,931 test rows. The Spline Logistic Regression (6 knots, C = 0.03) and CatBoost (#13 settings)
+# are fit the same way for comparison. A 0.7099 (spline LR) vs 0.7095 (GAM) test AUC is **not** evidence that one is better: the 95% intervals
+# overlap almost completely.
+
+# %%
+X_te, y_te_s = load_test_once(); YT = y_te_s.values
+print("[FRESH] test set:", X_te.shape, "| share Needs Maintenance:", round(float(YT.mean()), 4))
+print("[FRESH] total observations:", N + len(YT), "= development", N, "+ test", len(YT))
+overlap_dt = len(key(pd.concat([train_df, val_df])) & key(X_te))
+print("[VERIFY] identical feature rows shared by development and test:", overlap_dt)
+
+spline_model = spline_lr(6, C=0.03).fit(X, YV)          # comparator: Spline Logistic Regression (kept as its own experiment)
+p_spline = spline_model.predict_proba(X_te)[:, 1]
+
+TEST_P = {"Spline LR (6 knots, C=0.03)": p_spline}
+t0 = time.time(); gam_model = GAM(20).fit(X, YV); TEST_P["GAM (20 splines)"] = gam_model.predict_proba(X_te)[:, 1]
+print(f"[FRESH] GAM fit in {time.time() - t0:.0f}s")
+final_model = gam_model; p_final = TEST_P["GAM (20 splines)"]      # the SELECTED model
+if catboost is not None:
+    cb_model = CatBoostClassifier(**CB_PARAMS, random_seed=RANDOM_STATE, verbose=0, thread_count=2, allow_writing_files=False).fit(X, YV)
+    TEST_P["CatBoost (#13 settings)"] = cb_model.predict_proba(X_te)[:, 1]
+
+rng = np.random.default_rng(RANDOM_STATE); BOOT = [rng.integers(0, len(YT), len(YT)) for _ in range(2000)]
+trows = []
+for nm, p in TEST_P.items():
+    bs = [roc_auc_score(YT[i], p[i]) for i in BOOT]
+    trows.append({"model": nm, "test AUC": roc_auc_score(YT, p), "95% CI low": np.percentile(bs, 2.5), "95% CI high": np.percentile(bs, 97.5),
+                  "PR AUC": average_precision_score(YT, p), "Brier": brier_score_loss(YT, p)})
+test_table = pd.DataFrame(trows).set_index("model").round(4)
+print("\n[FRESH] Held-out test results (fit on 16,604 development rows, scored once on 2,931 test rows; 2,000 bootstrap resamples):")
+display(test_table)
+print("Brier of always predicting the test prevalence:", round(float(YT.mean() * (1 - YT.mean())), 4))
+
+# paired bootstrap difference, spline LR minus the others
+for nm in [k for k in TEST_P if k != "Spline LR (6 knots, C=0.03)"]:
+    d = [roc_auc_score(YT[i], TEST_P["Spline LR (6 knots, C=0.03)"][i]) - roc_auc_score(YT[i], TEST_P[nm][i]) for i in BOOT]
+    print(f"[FRESH] paired bootstrap: Spline LR - {nm}: {np.mean(d):+.4f} (95% CI {np.percentile(d, 2.5):+.4f} to {np.percentile(d, 97.5):+.4f})  -> interval contains 0: {np.percentile(d, 2.5) <= 0 <= np.percentile(d, 97.5)}")
+
+# %%
+# --- [VERIFY] against the saved test results, and recompute the stored historical test predictions ---
+EXPECT_TEST = {"Spline LR (6 knots, C=0.03)": 0.7099, "GAM (20 splines)": 0.7095, "CatBoost (#13 settings)": 0.7085}
+chk = []
+for nm, e in EXPECT_TEST.items():
+    if nm in test_table.index:
+        v = float(test_table.loc[nm, "test AUC"]); chk.append({"model": nm, "fresh test AUC": v, "[HISTORICAL] test AUC": e, "difference": round(v - e, 4), "agrees (|diff| <= 0.002)": abs(v - e) <= 0.002})
+display(pd.DataFrame(chk).set_index("model"))
+
+tp1 = pd.read_csv(ROOT / "results" / "test_predictions.csv"); tp2 = pd.read_csv(ROOT / "experiments" / "test_predictions_improvement.csv")
+assert (tp1.y_true.values == YT).all() and (tp2.y_true.values == YT).all(), "stored test labels differ from the freshly loaded test labels"
+srows = [{"stored predictions": c, "AUC recomputed now": round(roc_auc_score(YT, df_[c]), 4)} for df_ in (tp1, tp2) for c in df_.columns if c != "y_true"]
+print("[HISTORICAL predictions, metric recomputed now] stored test-set predictions of the six finalists (labels match the fresh test labels):")
+display(pd.DataFrame(srows).set_index("stored predictions"))
+
+# %%
+fig, axes = plt.subplots(1, 2, figsize=(12, 4.6))
+for nm, p in TEST_P.items():
+    fpr, tpr, _ = roc_curve(YT, p); axes[0].plot(fpr, tpr, label=f"{nm} (AUC {roc_auc_score(YT, p):.4f})")
+axes[0].plot([0, 1], [0, 1], "k:", label="no skill"); axes[0].set_xlabel("false positive rate"); axes[0].set_ylabel("true positive rate")
+axes[0].set_title("[FRESH] Test-set ROC curves"); axes[0].legend(fontsize=8, loc="lower right")
+
+cm = confusion_matrix(YT, (p_final >= 0.5).astype(int))
+im = axes[1].imshow(cm, cmap="Blues")
+for (i, j), v in np.ndenumerate(cm): axes[1].text(j, i, f"{v:,}", ha="center", va="center", fontsize=13, color="white" if v > cm.max() / 2 else "black")
+axes[1].set_xticks([0, 1]); axes[1].set_xticklabels(["pred Normal", "pred Needs Maint."]); axes[1].set_yticks([0, 1]); axes[1].set_yticklabels(["true Normal", "true Needs Maint."])
+axes[1].set_title("[FRESH] GAM confusion matrix on test at threshold 0.5\n(reference only; Section K chooses the operating threshold on development data)", fontsize=9)
+plt.tight_layout(); plt.show()
+
+# %% [markdown]
+# ## J. Feature importance and interpretability
+# Importance is measured **without touching the test set**: models are fit on the 14,650 training rows and sensors are shuffled on the
+# 1,954 validation rows (AUC drop, 20 repeats). Response curves show the average predicted risk as one sensor moves while the other five keep their real values.
+
+# %%
+X_tr, y_tr = train_df[RAW_FEATURES], train_df[TARGET].values
+X_va, y_va = val_df[RAW_FEATURES], val_df[TARGET].values
+imp_models = {"GAM": GAM(20).fit(X_tr, y_tr), "Spline LR": spline_lr(6, C=0.03).fit(X_tr, y_tr)}
+if catboost is not None:
+    imp_models["CatBoost"] = CatBoostClassifier(**CB_PARAMS, random_seed=RANDOM_STATE, verbose=0, thread_count=2, allow_writing_files=False).fit(X_tr, y_tr)
+imp = {}
+for nm, m in imp_models.items():
+    r = permutation_importance(m, X_va, y_va, scoring="roc_auc", n_repeats=20, random_state=RANDOM_STATE)
+    imp[nm] = pd.DataFrame({"mean": r.importances_mean, "std": r.importances_std}, index=RAW_FEATURES)
+    print(f"[FRESH] {nm}: validation AUC {roc_auc_score(y_va, m.predict_proba(X_va)[:, 1]):.4f}")
+order = imp["GAM"]["mean"].sort_values().index
+fig, ax = plt.subplots(figsize=(8, 4)); h = 0.38
+for k, (nm, d) in enumerate(imp.items()):
+    ax.barh(np.arange(6) + (k - 0.5 * (len(imp) - 1)) * h, d.loc[order, "mean"], xerr=d.loc[order, "std"], height=h, label=nm)
+ax.set_yticks(range(6)); ax.set_yticklabels(order); ax.set_xlabel("drop in validation ROC AUC when the sensor is shuffled"); ax.legend()
+ax.set_title("[FRESH] Permutation importance (fit on train, scored on validation)"); plt.tight_layout(); plt.show()
+display(pd.concat({k: v["mean"] for k, v in imp.items()}, axis=1).loc[order[::-1]].round(4))
+print("[HISTORICAL] interpretation.ipynb (CatBoost, validation): Engine RPM 0.146, Fuel Pressure 0.027, Lub Oil Temp 0.016, Lub Oil Pressure 0.013, Coolant Pressure 0.004, Coolant Temp ~0")
+
+# %%
+S = X.sample(1500, random_state=0).reset_index(drop=True)
+fig, axes = plt.subplots(2, 3, figsize=(14, 6.5), sharey=True)
+for ax, c in zip(axes.ravel(), RAW_FEATURES):
+    grid = np.linspace(*np.quantile(X[c], [0.01, 0.99]), 40)
+    def curve(m):
+        out = []
+        for g in grid:
+            Z = S.copy(); Z[c] = g; out.append(m.predict_proba(Z)[:, 1].mean())
+        return out
+    ax.plot(grid, curve(gam_model), lw=2, label="GAM (selected, deployed)")
+    ax.plot(grid, curve(spline_model), lw=1.5, ls="--", label="Spline LR (comparator)")
+    edges = np.unique(np.quantile(X[c], np.linspace(0, 1, 21))); idx = np.clip(np.digitize(X[c], edges[1:-1]), 0, len(edges) - 2)
+    ax.scatter([X[c][idx == b].median() for b in range(len(edges) - 1)], [YV[idx == b].mean() for b in range(len(edges) - 1)], s=14, c="gray", alpha=.6, label="observed rate")
+    ax.set_title(f"{c} ({UNITS[c]})", fontsize=10)
+axes[0, 0].legend(fontsize=8); axes[0, 0].set_ylabel("predicted risk"); axes[1, 0].set_ylabel("predicted risk")
+fig.suptitle("[FRESH] Sensor response curves (average predicted probability of Needs Maintenance)", y=1.0); plt.tight_layout(); plt.show()
+
+# %% [markdown]
+# ## K. Threshold selection and business cost analysis
+# **Threshold and cost decisions use development-set out-of-fold predictions only** (repeat 1 of the Section F GAM folds; the Spline LR comparator is shown as a sensitivity check).
+# The chosen thresholds are then applied once to the test predictions already computed in Section I.
+# Costs are *hypothetical*: one unneeded inspection costs 1 unit, one missed fault costs *r* units. The dataset contains no cost data.
+
+# %%
+assert "GAM (20 splines)" in OOF, "the GAM cross-validation run (Section F) is required for the business analysis"
+p_oof = OOF["GAM (20 splines)"][0]; prev = YV.mean()      # selected model, development out-of-fold (repeat 1)
+def at_threshold(p, yy, t):
+    pr = p >= t; tp = (pr & (yy == 1)).sum(); fp = (pr & (yy == 0)).sum(); fn = (~pr & (yy == 1)).sum(); tn = (~pr & (yy == 0)).sum()
+    prec = tp / max(tp + fp, 1); rec = tp / (tp + fn); spec = tn / (tn + fp)
+    return {"threshold": t, "flagged_%": 100 * pr.mean(), "precision": prec, "recall": rec, "specificity": spec, "balanced_acc": (rec + spec) / 2}
+thr = pd.DataFrame([at_threshold(p_oof, YV, t) for t in np.round(np.arange(0.40, 0.86, 0.05), 2)]).set_index("threshold")
+print("[FRESH] Threshold trade-off, development out-of-fold (always-flag precision =", round(float(prev), 3), "):")
+display(thr.round(3))
+T_BAL = float(thr["balanced_acc"].idxmax()); print("[FRESH] threshold with best balanced accuracy on development data:", T_BAL)
+
+order_ = np.argsort(-p_oof); ys = YV[order_]
+topk = pd.DataFrame([{"inspect_top_%": k, "precision": ys[:int(N * k / 100)].mean(), "lift_vs_random": ys[:int(N * k / 100)].mean() / prev,
+                      "faults_caught_%": 100 * ys[:int(N * k / 100)].sum() / ys.sum()} for k in (5, 10, 20, 30, 40, 50, 70)]).set_index("inspect_top_%")
+print("[FRESH] Capacity view: inspect the top k% by risk score (development out-of-fold):"); display(topk.round(3))
+
+# %%
+grid_t = np.round(np.arange(0.05, 0.96, 0.01), 2)
+def cost_scenarios(p):
+    """Hypothetical cost per engine for each miss-cost ratio r (1 unneeded inspection = 1 unit, 1 missed fault = r units)."""
+    crows = []
+    for r in (1, 1.5, 2, 3, 5):
+        cs = [(((p >= t) & (YV == 0)).sum() + r * ((p < t) & (YV == 1)).sum()) / N for t in grid_t]; j = int(np.argmin(cs))
+        all_c, none_c = 1 - prev, r * prev
+        crows.append({"miss_cost_r": r, "best_threshold": grid_t[j], "model_cost": cs[j], "inspect_all": all_c, "inspect_none": none_c,
+                      "saving_vs_best_no_model_%": 100 * (min(all_c, none_c) - cs[j]) / min(all_c, none_c), "flagged_%": 100 * (p >= grid_t[j]).mean()})
+    return pd.DataFrame(crows).set_index("miss_cost_r")
+cost = cost_scenarios(p_oof)
+cost_spline = cost_scenarios(OOF["Spline LR (6 knots, C=0.03)"][0])
+print("[FRESH] HYPOTHETICAL cost scenarios (development out-of-fold, GAM):"); display(cost.round(4))
+print("[FRESH] Sensitivity: the same scenarios with the Spline LR comparator's out-of-fold predictions (development data):"); display(cost_spline.round(4))
+hist_cost = pd.read_csv(ROOT / "reports" / "cost_sensitivity.csv")
+print("[HISTORICAL] reports/cost_sensitivity.csv (HistGradientBoosting, 5-fold; a different model, shown for context):"); display(hist_cost.round(4))
+
+# apply the development-chosen thresholds once to the test predictions
+app = []
+for label, t in [("balanced-accuracy threshold (dev)", T_BAL), ("cost-optimal r=1 (dev)", float(cost.loc[1, "best_threshold"])), ("cost-optimal r=2 (dev)", float(cost.loc[2, "best_threshold"]))]:
+    row = at_threshold(p_final, YT, t); row["rule"] = label; app.append(row)
+print("[FRESH] Development-chosen thresholds applied once to the test set (no re-tuning):"); display(pd.DataFrame(app).set_index("rule").round(3))
+
+fig, axes = plt.subplots(1, 3, figsize=(15, 4))
+for c in ("precision", "recall", "balanced_acc"): axes[0].plot(thr.index, thr[c], marker="o", label=c)
+axes[0].axhline(prev, ls="--", c="gray", label="precision if all flagged"); axes[0].set_xlabel("threshold"); axes[0].legend(fontsize=8); axes[0].set_title("[FRESH] Threshold trade-off")
+for r in (1, 2, 3, 5): axes[1].plot(grid_t, [(((p_oof >= t) & (YV == 0)).sum() + r * ((p_oof < t) & (YV == 1)).sum()) / N for t in grid_t], label=f"miss cost r={r}")
+axes[1].set_xlabel("threshold"); axes[1].set_ylabel("expected cost per engine (hypothetical units)"); axes[1].legend(fontsize=8); axes[1].set_title("[FRESH] Cost vs threshold")
+qs = np.quantile(p_oof, np.linspace(0, 1, 11)); bi = np.clip(np.digitize(p_oof, qs[1:-1]), 0, 9)
+axes[2].plot([p_oof[bi == b].mean() for b in range(10)], [YV[bi == b].mean() for b in range(10)], marker="o"); axes[2].plot([0.3, 1], [0.3, 1], "--", c="gray")
+axes[2].set_xlabel("mean predicted probability (decile)"); axes[2].set_ylabel("observed share Needs Maintenance"); axes[2].set_title(f"[FRESH] Calibration (OOF Brier {brier_score_loss(YV, p_oof):.4f})")
+plt.tight_layout(); plt.show()
+print("Reading: when a missed fault costs 3x or more, the cost-optimal rule flags (almost) every engine, so the model adds little over 'inspect everything'.")
+print("These are scenarios, not forecasts. Scores prioritise inspections; they are not diagnoses, and human review is required.")
+
+# %% [markdown]
+# ### K.1 Check against the results quoted in the final report
+# The report quotes these business results for the selected GAM. They are **checked, not forced**: each line is recomputed above from the
+# development-set out-of-fold GAM predictions, and a difference would be shown as `False` below. Everything here is development-set out-of-fold;
+# the test set is used only in the cell above ("applied once"), with thresholds chosen on development data.
+
+# %%
+def _row(name, fresh, reported, tol):
+    return {"quantity": name, "fresh (GAM, development out-of-fold)": round(float(fresh), 4), "reported in final report": reported,
+            "tolerance": tol, "agrees": abs(float(fresh) - reported) <= tol}
+kv = pd.DataFrame([
+    _row("top-10% precision", topk.loc[10, "precision"], 0.91, 0.01),
+    _row("top-10% share of faults caught (recall)", topk.loc[10, "faults_caught_%"] / 100, 0.14, 0.01),
+    _row("random-selection precision (prevalence)", prev, 0.63, 0.01),
+    _row("cost-optimal threshold, equal costs (r = 1)", cost.loc[1, "best_threshold"], 0.49, 0.02),
+    _row("share of engines flagged at that threshold, %", cost.loc[1, "flagged_%"], 78.0, 1.0),
+    _row("hypothetical saving vs inspect-all, r = 1, %", cost.loc[1, "saving_vs_best_no_model_%"], 11.1, 0.3)]).set_index("quantity")
+print("[VERIFY] Business results quoted in the final report vs the fresh GAM computation:"); display(kv)
+r3 = float(cost.loc[3, "saving_vs_best_no_model_%"])
+print(f"[VERIFY] r = 3: the GAM's saving over the best no-model option is {r3:.2f}% -> inspect-all is preferable (the model adds at most 0.1 percentage point): {abs(r3) <= 0.1}")
+K_CHECK_OK = bool(kv["agrees"].all()) and abs(r3) <= 0.1
+
+# %% [markdown]
+# ## L. Final model selection and export
+# **Final model: the penalised GAM (20 splines per sensor).** It was selected for three reasons: (1) its cross-validation score is competitive with
+# every other family (it is statistically tied with the spline logistic regression and with tuned boosting, so no superiority is claimed);
+# (2) it is **interpretable**, because it is additive: one smooth curve per sensor plus an intercept, so each prediction splits exactly into
+# per-sensor contributions; (3) it is **easy to implement**: 120 spline coefficients plus the knots, which a browser can evaluate without a server.
+# The Spline Logistic Regression (6 knots, C = 0.03) remains in this notebook, and in the 99 historical runs, as a separate comparator.
+
+# %%
+import joblib
+OUT = Path("/content/outputs") if Path("/content").exists() else Path("outputs"); OUT.mkdir(parents=True, exist_ok=True)
+joblib.dump(gam_model, OUT / "gam_final.joblib")
+reloaded = joblib.load(OUT / "gam_final.joblib")
+print("[VERIFY] reloaded GAM reproduces test predictions exactly:", bool(np.allclose(reloaded.predict_proba(X_te)[:, 1], p_final, atol=1e-12)))
+
+g_ = gam_model.g_
+gam_export = {"model": "pyGAM LogisticGAM: one cubic P-spline term (20 splines) per sensor + intercept; smoothing chosen by a lambda grid on development data",
+              "features": RAW_FEATURES, "trained_on_rows": int(N), "random_state": RANDOM_STATE, "n_splines": 20,
+              "lambda_per_term": [float(np.ravel(l)[0]) for l in g_.lam],
+              "edge_knots": [[float(v) for v in np.ravel(g_.terms[j].edge_knots_)] for j in range(len(RAW_FEATURES))],
+              "coef": [float(v) for v in np.ravel(g_.coef_)]}
+(OUT / "gam_export.json").write_text(json.dumps(gam_export))
+print("[FRESH] exported the GAM:", len(gam_export["coef"]), "coefficients (6 sensors x 20 splines + intercept) ->", OUT / "gam_export.json")
+
+# the spline logistic regression comparator is kept too (it is a separate experiment, not the selected model)
+joblib.dump(spline_model, OUT / "spline_lr_comparator.joblib")
+reloaded_spline = joblib.load(OUT / "spline_lr_comparator.joblib")
+print("[VERIFY] reloaded spline LR comparator reproduces test predictions exactly:", bool(np.allclose(reloaded_spline.predict_proba(X_te)[:, 1], p_spline, atol=1e-12)))
+print("The deployed dashboard model (dashboard/model/model.json, produced by notebooks/dashboard_model_export_gam.ipynb) is the same GAM definition; this notebook neither reads nor modifies it.")
+print("\nFinal test AUC (fresh): GAM", round(float(test_table.loc['GAM (20 splines)', 'test AUC']), 4), "| Spline LR comparator", round(float(test_table.loc['Spline LR (6 knots, C=0.03)', 'test AUC']), 4))
+
+# %% [markdown]
+# ## M. Reproduction instructions, dependencies and verification summary
+# 1. Open the notebook in Colab: `https://colab.research.google.com/github/cynthia-0316/smartops/blob/feat/final-colab-gam-consistency/notebooks/SmartOps_Final_Colab_Analysis.ipynb`
+# 2. **Runtime > Run all**. Internet access is required (GitHub for the saved experiment artifacts, Hugging Face for the data).
+# 3. The last cell exports this executed notebook to HTML and downloads it. Provenance of the code: `src/common.py`, `experiments/harness.py`, `experiments/models.py`,
+#    `experiments/batch1.py`-`batch5.py`, `experiments/nested_final.py`, `experiments/torch_nets.py`, and `notebooks/*.ipynb` (all printed in full in the results page's code appendix).
+# 4. Dependencies: pandas, numpy, scipy, scikit-learn, matplotlib, joblib (preinstalled in Colab) plus `pygam` and `catboost` (installed in Section 0).
+#    Historical-only dependencies (not needed here): `interpret` (EBM), `torch`, `xgboost`, `lightgbm`.
+
+# %%
+checks = {}
+checks["19,535 total observations"] = len(full) == 19535 and N + len(YT) == 19535
+checks["16,604 development rows"] = N == 16604
+checks["2,931 test rows"] = len(YT) == 2931
+checks["six raw sensor features"] = len(RAW_FEATURES) == 6
+checks["no missing values, no duplicate rows"] = int(full.isna().sum().sum()) == 0 and int(full.duplicated().sum()) == 0
+checks["HF data identical to repo data/engine/engine_data.csv"] = bool(full.equals(repo_copy))
+checks["train and validation share no feature rows"] = overlap_tv == 0
+checks["development and test share no feature rows"] = overlap_dt == 0
+checks["15 CV folds (5-fold x 3 repeats, seed 42)"] = len(FOLDS) == 15
+checks["test set loaded exactly once"] = TEST_LOADS["count"] == 1
+checks["99 historical configurations reproduced from saved logs"] = len(HIST) == 99 and counts == EXPECTED
+checks["fresh CV scores agree with saved historical runs (<=0.002)"] = bool(verify_cv["agrees (|diff| <= 0.002)"].all())
+checks["fresh test AUC agrees with saved results (<=0.002)"] = all(abs(float(test_table.loc[k, "test AUC"]) - v) <= 0.002 for k, v in EXPECT_TEST.items() if k in test_table.index)
+checks["spline LR test AUC ~ 0.7099"] = abs(float(test_table.loc["Spline LR (6 knots, C=0.03)", "test AUC"]) - 0.7099) <= 0.002
+checks["spline LR vs GAM test difference interval contains 0 (no superiority claim)"] = True if gam_model is None else bool(np.percentile([roc_auc_score(YT[i], TEST_P["Spline LR (6 knots, C=0.03)"][i]) - roc_auc_score(YT[i], TEST_P["GAM (20 splines)"][i]) for i in BOOT], 2.5) <= 0)
+checks["GAM export reloads exactly"] = bool(np.allclose(reloaded.predict_proba(X_te)[:, 1], p_final, atol=1e-12))
+checks["spline LR comparator export reloads exactly"] = bool(np.allclose(reloaded_spline.predict_proba(X_te)[:, 1], p_spline, atol=1e-12))
+checks["GAM test AUC ~ 0.7095"] = abs(float(test_table.loc["GAM (20 splines)", "test AUC"]) - 0.7095) <= 0.002
+checks["GAM CV AUC ~ 0.7041 (fresh vs saved log)"] = abs(float(RESULTS["GAM (20 splines)"]["cv_auc"]) - 0.7041) <= 0.002
+checks["business results quoted in the report reproduced by the GAM (Section K.1)"] = bool(K_CHECK_OK)
+for k, v in checks.items(): print(("PASS " if v else "FAIL ") + k)
+print("\nALL CHECKS PASSED" if all(checks.values()) else "\nSOME CHECKS FAILED: read the FAIL lines above (a mismatch is reported, never hidden)")
+if gam_model is None: print("NOTE: the GAM could not be fitted in this runtime; its rows are omitted rather than filled with saved numbers.")
+(OUT / "verification_summary.json").write_text(json.dumps({"checks": {k: bool(v) for k, v in checks.items()}, "python": platform.python_version(), "sklearn": sklearn.__version__, "pandas": pd.__version__, "numpy": np.__version__}, indent=2))
+
+provenance = pd.DataFrame([
+    ["Dataset shapes, class balance, data quality, EDA", "[FRESH]", "Sections A-C"],
+    ["Splits, leakage checks, CV folds", "[FRESH]", "Section D"],
+    ["Baselines + 8 representative (incl. the selected GAM) models, 15-fold CV", "[FRESH]", "Sections E-F (compared with saved runs in H)"],
+    ["Nested-CV spline LR", "[FRESH]", "Section G"],
+    ["Test-set results for GAM (selected), spline LR, CatBoost (#13 settings)", "[FRESH]", "Section I"],
+    ["Permutation importance, response curves", "[FRESH]", "Section J"],
+    ["Threshold and hypothetical cost analysis (selected GAM)", "[FRESH]", "Section K"],
+    ["99 configurations (all families)", "[HISTORICAL]", "experiments/log.csv, results/model_results.csv, not rerun"],
+    ["Test predictions of boosting finalists, stack", "[HISTORICAL]", "AUC recomputed now from saved predictions; models not refit"],
+    ["EBM, pyGAM CV sweeps, PyTorch nets, stacks, XGBoost/LightGBM tuning", "[HISTORICAL]", "hours of compute; see scripts in the code appendix"],
+], columns=["What", "Status", "Where / source"])
+display(provenance.set_index("What"))
+
+# %% [markdown]
+# ## Export this executed notebook to HTML (official submission file)
+# This cell reads the notebook *as it currently exists in your Colab session, with all outputs*, converts it with `jupyter nbconvert`,
+# and downloads `SmartOps_Final_Colab_Analysis.html` (plus the executed `.ipynb`). Run it **after** every cell above has finished.
+# If the download is blocked, use the manual route printed below.
+
+# %%
+try:
+    from google.colab import _message, files
+    nb = _message.blocking_request("get_ipynb", request="", timeout_sec=600)["ipynb"]
+    n_out = sum(1 for c in nb["cells"] if c["cell_type"] == "code" and c.get("outputs"))
+    n_code = sum(1 for c in nb["cells"] if c["cell_type"] == "code")
+    print(f"notebook has {n_code} code cells, {n_out} with saved outputs")
+    assert n_out >= n_code - 4, "outputs are missing: run all cells first, then re-run this cell"
+    nb.setdefault("metadata", {}).pop("widgets", None)
+    with open("SmartOps_Final_Colab_Analysis.ipynb", "w") as f: json.dump(nb, f)
+    subprocess.run([sys.executable, "-m", "jupyter", "nbconvert", "--to", "html", "SmartOps_Final_Colab_Analysis.ipynb"], check=True)
+    # Apply the SmartOps look (same palette and fonts as the Model Lineup page). Content is not changed.
+    THEME = """<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style id="smartops-theme">
+:root { --jp-ui-font-family: "IBM Plex Sans", system-ui, sans-serif; --jp-content-font-family: "IBM Plex Sans", system-ui, sans-serif; --jp-code-font-family: "IBM Plex Mono", ui-monospace, monospace;
+  --jp-layout-color0: #f4f6f8; --jp-layout-color1: #f4f6f8; --jp-brand-color1: #2a78d6; --jp-content-link-color: #2a78d6; --jp-ui-font-color1: #11161c; --jp-content-font-color1: #11161c; }
+body, body.jp-Notebook, .jp-Notebook { background: #f4f6f8 !important; color: #11161c; font-family: "IBM Plex Sans", system-ui, sans-serif; }
+.jp-Notebook { max-width: 1040px; margin: 0 auto; }
+h1, h2, h3, .jp-RenderedHTMLCommon h1, .jp-RenderedHTMLCommon h2, .jp-RenderedHTMLCommon h3 { font-family: "Archivo", "Helvetica Neue", Arial, sans-serif !important; letter-spacing: -0.01em; color: #11161c; }
+.jp-RenderedHTMLCommon a { color: #2a78d6; }
+.jp-RenderedHTMLCommon table th { color: #6f7884; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.06em; }
+.jp-RenderedHTMLCommon code, .jp-Notebook pre, .highlight pre { font-family: "IBM Plex Mono", ui-monospace, monospace; }
+.jp-InputArea-editor, .jp-CodeCell .jp-InputArea-editor { background: #ffffff !important; border: 1px solid #e3e7eb !important; border-radius: 8px; }
+.jp-OutputArea-output, .jp-RenderedText pre { color: #11161c; }
+.jp-InputPrompt { color: #2a78d6 !important; } .jp-OutputPrompt { color: #eb6834 !important; }
+.highlight .k, .highlight .kn, .highlight .kc, .highlight .ow { color: #2a78d6; font-weight: 600; }
+.highlight .s, .highlight .s1, .highlight .s2, .highlight .sa, .highlight .sb, .highlight .si { color: #eb6834; }
+.highlight .c1, .highlight .c, .highlight .cm { color: #6f7884; font-style: italic; }
+.highlight .mi, .highlight .mf { color: #8a5a00; } .highlight .nb, .highlight .nf, .highlight .nn { color: #2a78d6; font-weight: 500; }
+</style>"""
+    _h = Path("SmartOps_Final_Colab_Analysis.html"); _txt = _h.read_text(encoding="utf-8")
+    _h.write_text(_txt.replace("</head>", THEME + "</head>", 1), encoding="utf-8")
+    size = Path("SmartOps_Final_Colab_Analysis.html").stat().st_size
+    print(f"exported SmartOps_Final_Colab_Analysis.html ({size/1e6:.1f} MB)")
+    files.download("SmartOps_Final_Colab_Analysis.html"); files.download("SmartOps_Final_Colab_Analysis.ipynb")
+except ImportError:
+    print("Not running in Colab. Locally: jupyter nbconvert --to html --execute notebooks/SmartOps_Final_Colab_Analysis.ipynb")
+except Exception as e:
+    print("Automatic export failed:", repr(e)[:300])
+    print("Manual route: File > Save a copy in Drive, then in a new cell run:\n  from google.colab import drive; drive.mount('/content/drive')\n  !jupyter nbconvert --to html '/content/drive/MyDrive/Colab Notebooks/SmartOps_Final_Colab_Analysis.ipynb'")

@@ -1,0 +1,41 @@
+name: Check notebook syntax (no execution)
+
+# Parses every code cell of the Colab notebook with Python's own parser. Nothing is executed.
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/final-colab-gam-consistency]
+    paths:
+      - notebooks/SmartOps_Final_Colab_Analysis.ipynb
+      - .github/workflows/check-notebook-syntax.yml
+
+permissions:
+  contents: read
+
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Parse all code cells
+        run: |
+          python - <<'PY'
+          import ast, json
+          nb = json.load(open("notebooks/SmartOps_Final_Colab_Analysis.ipynb", encoding="utf-8"))
+          bad = 0
+          for i, c in enumerate(nb["cells"]):
+              if c["cell_type"] != "code":
+                  continue
+              src = "".join(c["source"])
+              src = "\n".join("pass" if l.lstrip().startswith(("%", "!")) else l for l in src.split("\n"))
+              try:
+                  ast.parse(src)
+              except SyntaxError as e:
+                  bad += 1
+                  print(f"SYNTAX ERROR in cell {i}: {e}")
+          print("code cells checked:", sum(c["cell_type"] == "code" for c in nb["cells"]), "| errors:", bad)
+          raise SystemExit(1 if bad else 0)
+          PY

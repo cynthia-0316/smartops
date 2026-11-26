@@ -4,7 +4,7 @@ name: Export Colab HTML (conversion only)
 on:
   workflow_dispatch:
   push:
-    branches: [feat/final-colab-analysis]
+    branches: [feat/final-colab-analysis, feat/final-colab-gam-consistency]
     paths:
       - reports/colab_run/SmartOps_Final_Colab_Analysis.executed.ipynb
       - tools/export_colab_html.py
