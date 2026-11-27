@@ -16,7 +16,7 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..');
 const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8').replace(/\r\n/g, '\n');
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-const COLAB_URL = 'https://colab.research.google.com/github/cynthia-0316/smartops/blob/feat/final-colab-analysis/notebooks/SmartOps_Final_Colab_Analysis.ipynb';
+const COLAB_URL = 'https://colab.research.google.com/github/cynthia-0316/smartops/blob/feat/final-colab-gam-consistency/notebooks/SmartOps_Final_Colab_Analysis.ipynb';
 const FINAL_NB = 'notebooks/SmartOps_Final_Colab_Analysis.ipynb';
 
 /* ------------------------------------------------------------------ notebook helpers */
@@ -91,7 +91,7 @@ const SECTIONS = [
     items: [FINAL('H'), F('notebooks/final_model_comparison.ipynb', HIST, 'results-log comparison and fold-by-fold tests (#18)'),
             F('experiments/collect_report_data.py', HIST, 'assembles the leaderboard behind the results pages')] },
   { id: 'I', title: 'Final model evaluation (held-out test set)', shows: 'Test-set results chart and table', tiles: [
-      'Opens the test file once, scores the final spline LR, GAM and CatBoost, adds bootstrap intervals, ROC curves and a confusion matrix.'],
+      'Opens the test file once, scores the selected GAM, the spline LR comparator and CatBoost, adds bootstrap intervals, ROC curves and a confusion matrix.'],
     items: [FINAL('I')] },
   { id: 'J', title: 'Feature importance and interpretability', shows: 'Risk curves for each sensor', tiles: [
       'Permutation importance (fit on train, shuffle on validation) and per-sensor response curves; no test data used.'],
@@ -100,8 +100,8 @@ const SECTIONS = [
   { id: 'K', title: 'Threshold selection and business cost analysis', shows: 'Capacity view, hypothetical cost scenarios', tiles: [
       'Thresholds and costs are chosen on development out-of-fold predictions only; cost figures are hypothetical scenarios.'],
     items: [FINAL('K'), F('notebooks/threshold_and_calibration.ipynb', HIST, 'class weights, calibration, thresholds and cost view (#15)')] },
-  { id: 'L', title: 'Final model selection and export', shows: 'Lessons: why spline LR is deployed', tiles: [
-      'Refits the spline LR on all development data, saves it with joblib, exports knots and coefficients to JSON and verifies exact reload.'],
+  { id: 'L', title: 'Final model selection and export', shows: 'Lessons: why the GAM is selected and deployed', tiles: [
+      'Refits the selected GAM on all development data, saves it with joblib, exports its 121 coefficients and knots to JSON and verifies exact reload; the spline LR comparator is saved separately.'],
     items: [FINAL('L')] },
   { id: 'M', title: 'Reproduction instructions and dependencies', shows: 'Everything', tiles: [
       'Environment, install cell, verification checklist, provenance table and the in-Colab HTML export. Historical scripts: see experiments/RESULTS.md.'],
@@ -125,17 +125,15 @@ function must(from, to, all) {
 
 must('<title>SmartOps Model Lineup</title>', '<title>SmartOps: Model Results, Python Code &amp; Reproducibility</title>');
 
-/* --- wording: the deployed model is the spline LR; the GAM has the best single CV score; no superiority claims --- */
+/* --- wording: the GAM (20 splines) is the selected and deployed model; spline LR stays a separate comparator; no superiority claims --- */
 must('<li><b>Recommended model:</b> the GAM with 20 splines (CV 0.7041, test 0.7095). It is as accurate as anything else, fast, and you can plot exactly how each sensor moves the risk.</li>',
-  '<li><b>Two deployable choices, no proven winner.</b> The GAM with 20 splines has the best single-model CV score (0.7041, test 0.7095) and chooses its own smoothing. The dashboard deploys the spline logistic regression (CV 0.7032 at its fixed setting, 0.7026 nested; test 0.7099) because it is transparent and light enough to run inside a browser. The gap between them is not significant (CV +0.0009, p = 0.21; test difference −0.0004, 95% CI −0.002 to +0.001), so a slightly higher test AUC is not evidence that one is better.</li>');
+  '<li><b>Selected model:</b> the GAM with 20 splines (CV 0.7041, test 0.7095), which is also the model running in the dashboard. It was selected for its competitive cross-validation score, its interpretability (one readable curve per sensor) and its easy implementation (120 coefficients plus knots, evaluated in the browser). It is not claimed to be the most accurate: the spline logistic regression is statistically tied (CV 0.7032, 0.7026 nested; test 0.7099; CV difference +0.0009, p = 0.21; test difference interval contains 0), as is tuned boosting.</li>');
 must('We picked the GAM because it is as accurate as anything else and chooses its own smoothness, so its score needed no extra tuning.',
-  'The GAM has the best single-model CV score and chooses its own smoothness, so its score needed no extra tuning. The dashboard deploys the spline logistic regression instead: it is statistically tied with the GAM and lighter to run in a browser.');
-must('"Recommended final model"', '"Best single CV model"');
-must('recommended</span>', 'best CV</span>', true);
-must('GAM (recommended)', 'GAM (best single CV score)');
-must('<span><i class="sw hi"></i>Recommended model</span>', '<span><i class="sw hi"></i>Best CV score (GAM)</span>');
-must('${esc(t.name)}${t.name.startsWith("GAM") ? ` <span class="tag best">best CV</span>` : ""}',
-  '${esc(t.name)}${t.name.startsWith("GAM") ? ` <span class="tag best">best CV</span>` : ""}${t.name.startsWith("Spline") ? ` <span class="tag">deployed in dashboard</span>` : ""}');
+  'We selected the GAM for its competitive cross-validation score, its interpretability and its suitability for the browser dashboard; it also chooses its own smoothness, so its score needed no extra tuning. It is statistically tied with the spline logistic regression, which stays in the results as a separate comparator.');
+must('"Recommended final model"', '"Selected final model"');
+must('recommended</span>', 'selected</span>', true);
+must('GAM (recommended)', 'GAM (selected)');
+must('<span><i class="sw hi"></i>Recommended model</span>', '<span><i class="sw hi"></i>Selected model (GAM)</span>');
 
 /* --- nav, hero note, footer --- */
 must('<a href="#runs">All runs</a>', '<a href="#runs">All runs</a><a href="#business">Business decisions</a><a href="#code-appendix" class="nav-code">Code Appendix</a>');
@@ -157,7 +155,7 @@ const business = `
   </div>
   <div class="card">
     <ul class="plain">
-      <li><b>Interpretability and simple deployment beat a fraction of a percent.</b> Nine families land within about 0.002 AUC of each other, so the choice rests on other qualities. A spline logistic regression is a small set of knots and weights: a planner can inspect each sensor's curve, and the dashboard evaluates it in the browser with no server.</li>
+      <li><b>Interpretability and simple deployment beat a fraction of a percent.</b> Nine families land within about 0.002 AUC of each other, so the choice rests on other qualities. The selected GAM is one smooth curve per sensor (120 coefficients plus knots): a planner can inspect each curve, and the dashboard evaluates it in the browser with no server.</li>
       <li><b>Scores support inspection prioritisation. They are not diagnoses.</b> A high score means an engine resembles past engines labelled “needs maintenance”; it says nothing about which component is at fault.</li>
       <li><b>Cost-saving scenarios are hypothetical.</b> The data has no cost information. With cheap unneeded inspections the model can beat “inspect everything”; once a missed fault costs about three times an unneeded inspection, the cost-optimal rule flags almost every engine (see code appendix, Section K).</li>
       <li><b>Human review is required.</b> Roughly 20 to 30 percent of flagged engines are false alarms at the thresholds we examined (precision about 0.70 to 0.78 at thresholds 0.50 to 0.65), and an AUC near 0.71 is a ranking aid, not a verdict.</li>
@@ -175,7 +173,7 @@ const business = `
     <div class="grid2">
       <div><span class="lbl">Data separation</span><p>19,535 engines in total: 16,604 development rows (train + validation) for every model choice, and 2,931 held-out test rows opened once, after the choices were fixed. No threshold or setting was tuned on the test set.</p></div>
       <div><span class="lbl">Three kinds of CV score</span><p><b>Nested</b>: tuning happened inside each training fold (fair). <b>Fixed setting</b>: no tuning on these folds (fair). <b>Same-fold selection</b>: settings were chosen on the same folds (hollow dots, slightly optimistic). Never compare them as if they were the same.</p></div>
-      <div><span class="lbl">Freshly executed vs saved results</span><p>The 99 configurations on this page are <b>saved, verified results</b> from the team's experiment log; they were not rerun (hours of compute). The final Colab notebook <b>re-executes</b> one representative model per family, a nested-CV spline LR, the test-set evaluation, importance and threshold analysis, and checks them against the saved numbers.</p></div>
+      <div><span class="lbl">Freshly executed vs saved results</span><p>The 99 configurations on this page are <b>saved, verified results</b> from the team's experiment log; they were not rerun (hours of compute). The final Colab notebook <b>re-executes</b> one representative model per family (including the selected GAM), a nested-CV spline LR, the test-set evaluation, importance and threshold analysis, and checks them against the saved numbers.</p></div>
       <div><span class="lbl">Which file is the official submission?</span><p><code>SmartOps_Final_Colab_Analysis.html</code>, exported from the executed Colab notebook, satisfies the course requirement (code plus executed results). This page is the presentation version with the same models and conclusions.</p></div>
     </div>
   </div>
@@ -254,7 +252,7 @@ const appendix = `
   </div>
   <div class="card">
     <div class="provenance">
-      <div><span class="pill fresh">FRESH</span><p>Re-executed in <code>SmartOps_Final_Colab_Analysis.ipynb</code> from the raw data: dataset checks, representative models of each family, nested CV of the spline LR, test evaluation, importance, thresholds and costs.</p></div>
+      <div><span class="pill fresh">FRESH</span><p>Re-executed in <code>SmartOps_Final_Colab_Analysis.ipynb</code> from the raw data: dataset checks, representative models of each family including the selected GAM, nested CV of the spline LR, test evaluation, importance, thresholds and costs.</p></div>
       <div><span class="pill hist">HISTORICAL</span><p>Produced earlier by the scripts and notebooks shown with this tag. Their saved results (99 configurations, boosting test predictions) are loaded and verified, <b>not rerun</b>, in the final notebook.</p></div>
       <div><span class="lbl">Executed notebook, embedded below</span><p>All code cells with the outputs saved by Colab (tables, charts, 16/16 verification checks). Rendered from the executed notebook; nothing was rerun or edited.</p></div>
       <div><span class="lbl">Run it yourself</span><p><a href="${colabHtml}" target="_blank" rel="noopener">Open the notebook in Google Colab</a>, then Runtime &gt; Run all (about 15 to 25 minutes, no local install).</p></div>

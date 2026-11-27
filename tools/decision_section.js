@@ -49,7 +49,7 @@ module.exports = function decisionSection(nbFile) {
   const expect = (cond, msg) => { if (!cond) throw new Error('decision_section: prose no longer matches the notebook: ' + msg); };
   expect(Math.abs(num(c1[ci('best_threshold')]) - 0.49) < 1e-9, 'best threshold at equal costs is 0.49');
   expect(Math.abs(num(c1[ci('saving_vs_best_no_model_%')]) - 11.1) < 0.1, 'saving at equal costs is about 11%');
-  expect(num(c3[ci('model_cost')]) >= num(c3[ci('inspect_all')]), 'at miss cost 3 the score rule is no better than inspect all');
+  expect(num(c3[ci('saving_vs_best_no_model_%')]) < 0.1, 'at miss cost 3 the score rule adds less than 0.1 percentage point over inspect all');
   expect(num(costRow(2)[ci('model_cost')]) < num(costRow(2)[ci('inspect_all')]), 'at miss cost 2 the score rule still helps a little');
   const tk = (k) => topk.rows.find((x) => num(x[0]) === k);
   const tkc = (name) => col(topk, name);
@@ -69,8 +69,8 @@ module.exports = function decisionSection(nbFile) {
     thrDev.rows.map((r) => [n(r[0], 2), `${n(r[tc('flagged_%')], 1)}%`, n(r[tc('precision')], 3), n(r[tc('recall')], 3), n(r[tc('specificity')], 3)]),
     (r) => (r[0] === '0.50' || r[0] === '0.65' ? 'top' : ''));
 
-  const bestOf = (r) => num(r[ci('model_cost')]) < Math.min(num(r[ci('inspect_all')]), num(r[ci('inspect_none')])) - 1e-9;
-  const costTable = T(['Missed fault costs … × an unneeded inspection', 'Best alert threshold', 'Score-based rule: cost per engine', 'Inspect every engine: cost per engine', 'Inspect none: cost per engine', 'Saving vs. best no-model option', 'Engines flagged', 'Cheapest strategy'],
+  const bestOf = (r) => num(r[ci('saving_vs_best_no_model_%')]) >= 0.1;   // below 0.1 point the model is not worth using
+  const costTable = T(['Missed fault costs … × an unneeded inspection', 'Best alert threshold', 'Score-based rule: cost per engine', 'Inspect every engine: cost per engine', 'Inspect none: cost per engine', 'Saving vs. best no-model option', 'Engines flagged', 'Preferred strategy'],
     cost.rows.map((r) => [`${num(r[0])}`, n(r[ci('best_threshold')], 2), n(r[ci('model_cost')], 4), n(r[ci('inspect_all')], 4), n(r[ci('inspect_none')], 4),
       (() => { const v = num(r[ci('saving_vs_best_no_model_%')]); return `${v >= 0 ? '' : '−'}${Math.abs(v).toFixed(Math.abs(v) < 1 ? 2 : 1)}%`; })(), `${n(r[ci('flagged_%')], 1)}%`,
       bestOf(r) ? 'Score threshold' : 'Inspect every engine']),
@@ -92,10 +92,10 @@ module.exports = function decisionSection(nbFile) {
   <div class="card">
     <h3>1 · The most important findings</h3>
     <ul class="plain">
-      <li><b>The ranking is useful but modest.</b> Nine very different model families converge on a cross-validated AUC of about 0.703 to 0.705, and the final models score about 0.71 on the held-out test set (spline logistic regression 0.7099, 95% CI 0.692 to 0.729). An AUC of 0.71 means the score ranks engines better than chance, not that it identifies faults reliably.</li>
+      <li><b>The ranking is useful but modest.</b> Nine very different model families converge on a cross-validated AUC of about 0.703 to 0.705, and the final models score about 0.71 on the held-out test set (selected GAM 0.7095, 95% CI 0.692 to 0.728; spline logistic regression 0.7099). An AUC of 0.71 means the score ranks engines better than chance, not that it identifies faults reliably.</li>
       <li><b>Curved effects matter; interactions and complexity do not.</b> Letting each sensor's effect bend lifts AUC from 0.688 to about 0.703. Boosting, forests and neural nets that can combine sensors do no better than additive models, so a simple, transparent model loses nothing.</li>
-      <li><b>Engine RPM drives the score.</b> Shuffling RPM costs about 0.145 AUC, more than five times any other sensor (fuel pressure about 0.026). Coolant temperature adds almost nothing.</li>
-      <li><b>No single model is proven best.</b> The spline logistic regression and the GAM differ by 0.0004 test AUC with overlapping intervals. The dashboard uses the spline model because it is transparent and light enough to run in a browser.</li>
+      <li><b>Engine RPM drives the score.</b> Shuffling RPM costs about 0.147 AUC in the GAM, more than five times any other sensor (fuel pressure about 0.026). Coolant temperature adds almost nothing.</li>
+      <li><b>The GAM is our selected model, but no single model is proven best.</b> It has the best single cross-validation score (0.7041) and is the model the dashboard runs. We selected it for its competitive score, its interpretability (one readable curve per sensor) and because it is easy to implement in a browser. It differs from the spline logistic regression by 0.0004 test AUC with overlapping intervals, so we claim no superiority.</li>
     </ul>
   </div>
 
@@ -119,7 +119,7 @@ module.exports = function decisionSection(nbFile) {
     ${costTable}
     <div class="learned"><span class="lbl">What the scenarios say</span>
       <p><b>Equal costs (r = 1):</b> the best threshold is about 0.49. It flags roughly 78% of engines and lowers the expected cost by about 11% compared with inspecting every engine.</p>
-      <p><b>Missed faults about 3× as costly (r = 3):</b> the score-based rule is no better than inspecting every engine under these assumptions (a difference of 0.0002 per engine, the wrong way), so inspecting everyone becomes the preferred strategy. At r = 1.5 and r = 2 the saving shrinks to about 4% and 1%.</p>
+      <p><b>Missed faults about 3× as costly (r = 3):</b> the score-based rule saves only about 0.03% over inspecting every engine under these assumptions (less than 0.0001 per engine), which is negligible, so inspecting everyone becomes the preferred strategy. At r = 1.5 and r = 2 the saving shrinks to about 3.5% and 1.3%.</p>
       <p>“Inspect none” is never the cheapest option in these scenarios.</p>
     </div>
     <figure class="figure">
@@ -144,7 +144,7 @@ module.exports = function decisionSection(nbFile) {
     <ul class="plain">
       <li><b>Scores support prioritisation. They are not diagnoses.</b> A high score means an engine resembles past engines labelled “needs maintenance”; it does not say which component is at fault.</li>
       <li><b>Human review is required.</b> About a quarter of flagged engines are false alarms at the thresholds above, and the AUC is a ranking aid, not a verdict.</li>
-      <li><b>Interpretability and simple deployment are the tie-breakers.</b> With many models equally accurate, a model whose curves a planner can read, and that runs in a browser, is the safer choice.</li>
+      <li><b>Interpretability and simple deployment are the tie-breakers.</b> With many models equally accurate, a model whose curves a planner can read, and that runs in a browser (the GAM), is the safer choice.</li>
       <li><b>Provenance is uncertain.</b> We do not know where the data came from, whether it is real or synthetic, or exactly how “needs maintenance” was defined, and there is no time or engine identifier. Treat every number as a property of this dataset.</li>
     </ul>
   </div>
