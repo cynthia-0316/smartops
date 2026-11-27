@@ -9,13 +9,13 @@
 | `reports/colab_run/SmartOps_Final_Colab_Analysis.executed.ipynb` | The notebook exactly as executed in Google Colab (outputs included). Source of both HTML files. |
 | `notebooks/SmartOps_Final_Colab_Analysis.ipynb` | The same notebook without outputs (what Colab opens from GitHub). |
 
-How the HTML was made: the notebook was **executed in Google Colab** (second full run, Python 3.13, scikit-learn 1.6.1). The HTML files were then **converted outside Colab** from that executed `.ipynb` (nbconvert on a GitHub Actions runner, and a Node renderer for the merged page). No cell was rerun and no output was edited; the export script refuses to run if the code cells differ from the committed notebook, if any output is an error, or if secret-like text is present. Colab-only scripts attached to DataFrame displays (they call `google.colab`, break outside Colab and only add an "interactive table" button) are removed; the tables themselves are untouched.
+How the HTML was made: the notebook was **executed in Google Colab** (third full run, after the GAM consistency update, Python 3.13, scikit-learn 1.6.1). The HTML files were then **converted outside Colab** from that executed `.ipynb` (nbconvert on a GitHub Actions runner, and a Node renderer for the merged page). No cell was rerun and no output was edited; the export script refuses to run if the code cells differ from the committed notebook, if any output is an error, or if secret-like text is present. Colab-only scripts attached to DataFrame displays (they call `google.colab`, break outside Colab and only add an "interactive table" button) are removed; the tables themselves are untouched.
 
 If the instructor insists on a file downloaded from inside a Colab session, run the last cell of the notebook in Colab; it performs the same nbconvert step there.
 
 ## Run in Google Colab (no local install)
 
-1. Open <https://colab.research.google.com/github/cynthia-0316/smartops/blob/feat/final-colab-analysis/notebooks/SmartOps_Final_Colab_Analysis.ipynb>
+1. Open <https://colab.research.google.com/github/cynthia-0316/smartops/blob/feat/final-colab-gam-consistency/notebooks/SmartOps_Final_Colab_Analysis.ipynb>
 2. **Runtime > Run all** (about 15 to 25 minutes on the free CPU runtime). The notebook installs `pygam` and `catboost`, downloads the data from Hugging Face and clones this repository for the saved experiment artifacts.
 3. When every cell has finished, the last cell exports the executed notebook with `jupyter nbconvert` and downloads `SmartOps_Final_Colab_Analysis.html` and the executed `.ipynb`.
 4. If the download is blocked: **File > Save a copy in Drive**, then run `!jupyter nbconvert --to html "<path to the copy>"` after mounting Drive.
@@ -29,11 +29,11 @@ If the instructor insists on a file downloaded from inside a Colab session, run 
 |---|---|
 | Dataset shapes, class balance, missing values, duplicates, outliers, EDA | Fresh |
 | Splits, leakage checks, 15 CV folds | Fresh |
-| Baselines and 7 representative models (LR, spline LR, Gaussian NB, kNN, RF, ET, HistGB, CatBoost with the #13 settings) | Fresh, compared with the saved runs (same folds and seeds) |
+| Baselines and 8 representative models (LR, spline LR, **GAM 20 splines**, Gaussian NB, kNN, RF, ET, HistGB, CatBoost with the #13 settings) | Fresh, compared with the saved runs (same folds and seeds) |
 | Nested-CV spline LR | Fresh |
-| Test-set evaluation of spline LR, GAM, CatBoost; bootstrap intervals; ROC; confusion matrix | Fresh (test file opened once) |
+| Test-set evaluation of the selected GAM, the spline LR comparator and CatBoost; bootstrap intervals; ROC; confusion matrix (GAM) | Fresh (test file opened once) |
 | Permutation importance, response curves | Fresh (train/validation only) |
-| Thresholds and hypothetical cost scenarios | Fresh (development out-of-fold only) |
+| Thresholds and hypothetical cost scenarios (selected GAM; spline LR as a sensitivity check) | Fresh (development out-of-fold only) |
 | 99 configurations (all families) | **Historical**, loaded from `experiments/log.csv` and `results/model_results.csv`; not rerun |
 | Boosting finalists' test predictions | **Historical**, AUC recomputed from the saved predictions; models not refit |
 | EBM, pyGAM sweeps, PyTorch nets, stacks, XGBoost/LightGBM tuning | **Historical** (hours of compute); source scripts are in the code appendix |
@@ -46,7 +46,7 @@ Done locally (Windows machine with no Python; nothing was installed):
 - Every appendix block is generated from the committed files, so nothing is abbreviated or hand-typed.
 - The page keeps PR #28's removal of the 0.707 "ceiling" claim (searched: no occurrence).
 - Numbers shown in the new text come from the repository: test AUC 0.7099 (spline LR) and 0.7095 (GAM), diff -0.0004 (CI -0.002 to +0.001), CV 0.7032 / nested 0.7026 / GAM 0.7041 (`experiments/RESULTS.md`, `reports/smartops_models.html`).
-- Wording change: the base page called the GAM the "recommended model". It now says the GAM has the best single CV score and that the dashboard deploys the spline logistic regression for transparency and lightweight browser deployment, with no superiority claim.
+- Wording: the GAM (20 splines per sensor) is the **selected and deployed** model (verified against the dashboard code, `model.json` and the live site, see `reports/GAM_CONSISTENCY_CHANGELOG.md`), chosen for competitive CV score, interpretability and implementation suitability, with no superiority claim. The spline logistic regression is kept as a separate comparator and is never relabelled as the GAM.
 - No secrets or tokens in any added file.
 
 ### Colab run (first execution, 2026-11-18)
@@ -59,3 +59,6 @@ The notebook ran top to bottom in Colab (Python 3.13, scikit-learn 1.6.1, pandas
 - Cost scenarios (hypothetical): at a miss cost 3x or more the cost-optimal rule flags ~everyone and saves nothing versus inspecting all.
 
 **Conversion checks (GitHub Actions, then local browser):** all 16 PASS lines present; no traceback; 8 charts embedded and loaded; code visible; no Colab API calls left; no secret-like strings; merged page renders 22 code cells, 19 tables, 8 images, no console errors, no horizontal overflow, results above the code.
+
+### Colab run (third execution, 2026-11-26, GAM consistency update)
+All 20 checks in Section M printed PASS (no cell errors). New in this run: the GAM scored on the same 15 folds (CV 0.7041, identical to the saved `pygam_ns20` run), Section K on the GAM's development out-of-fold predictions, and K.1 comparing the report's business numbers with the fresh values (all agree). Details and the cross-source table: `reports/GAM_CONSISTENCY_CHANGELOG.md`.
